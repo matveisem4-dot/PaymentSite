@@ -89,5 +89,26 @@
             }
         }
     </script>
+    async function handlePaymentClick() {
+    const userAmount = parseFloat(document.getElementById('input-field').value); // Что ввел юзер
+    
+    // Получаем данные из Firebase, которые оставил терминал
+    const response = await fetch(`${FIREBASE_BASE_URL}/status/${TERMINAL_ID}.json`);
+    const data = await response.json();
+    const requiredAmount = parseFloat(data.requiredAmount);
+
+    if (userAmount < requiredAmount) {
+        // ЕСЛИ СУММА МЕНЬШЕ
+        alert("Недостаточно средств! Нужно: " + requiredAmount + " руб.");
+    } else {
+        // ЕСЛИ СУММА РОВНО ИЛИ БОЛЬШЕ
+        await fetch(`${FIREBASE_BASE_URL}/status/${TERMINAL_ID}.json`, {
+            method: 'PUT',
+            body: JSON.stringify({ state: "SUCCESS" })
+        });
+        alert("Оплата прошла успешно!");
+    }
+}
+</script>        
 </body>
 </html>
