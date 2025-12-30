@@ -68,10 +68,27 @@
             await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
         }
 
-        // --- ЛОГИКА ОБЫЧНОЙ ОПЛАТЫ ---
+        // --- ЛОГИКА ОБЫЧНОЙ ОПЛАТЫ (С ВАЛИДАЦИЕЙ) ---
         async function handlePaymentClick() {
             const terminalId = document.getElementById('terminal-id').value;
             const userEntered = parseFloat(document.getElementById('payment-input').value);
+            const statusText = document.getElementById('status-text');
+
+            // 1. Проверка на наличие ID терминала
+            if (!terminalId || terminalId.length < 5) {
+                statusText.style.color = "red";
+                statusText.innerText = "Ошибка: Сначала введите ID терминала!";
+                return; // Останавливаем выполнение функции
+            }
+
+            // 2. Проверка на корректность суммы оплаты
+            if (isNaN(userEntered) || userEntered <= 0) {
+                statusText.style.color = "red";
+                statusText.innerText = "Ошибка: Сначала введите сумму оплаты!";
+                return; // Останавливаем выполнение функции
+            }
+            
+            // Если обе проверки пройдены, продолжаем процесс оплаты
             processFinalPayment(terminalId, userEntered);
         }
 
@@ -104,11 +121,9 @@
                         timerDiv.innerText = "";
                         statusText.innerText = "Сканирование улыбки...";
                         
-                        // Проверка улыбки
                         const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
                         
-                        if (detections.length > 0 && detections[0].expressions.happy > 0.5) {
-                            // Улыбка найдена — получаем нужную сумму и оплачиваем
+                        if (detections.length > 0 && detections.expressions.happy > 0.7) {
                             const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
                             const data = await response.json();
                             processFinalPayment(terminalId, data.requiredAmount);
