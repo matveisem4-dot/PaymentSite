@@ -52,156 +52,146 @@
         <p id="status-text" style="margin-top: 15px; font-weight: bold;"></p>
     </div>
 
-    <script>
-        const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
-        
-        // Автозаполнение ID из URL (если QR-код его передал)
-        window.onload = () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.has('id')) document.getElementById('terminal-id').value = urlParams.get('id');
-            loadModels();
-        };
+<script>
+    const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
+    let modelsLoaded = false;
 
-        async function loadModels() {
-            const MODEL_URL = 'raw.githubusercontent.com';
-            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    // Автозагрузка при старте
+    window.onload = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('id')) document.getElementById('terminal-id').value = urlParams.get('id');
+        loadModels();
+    };
+
+    // 1. Улучшенная загрузка тяжелых моделей для высокой точности
+    async function loadModels() {
+        const statusText = document.getElementById('status-text');
+        const MODEL_URL = 'raw.githubusercontent.com';
+        try {
+            // Используем SSD Mobilenet v1 для исключения ложных срабатываний
+            await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
             await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+            modelsLoaded = true;
+            statusText.innerText = "Система распознавания готова";
+        } catch (err) {
+            console.error("Ошибка загрузки ИИ:", err);
+            statusText.innerText = "Ошибка загрузки нейросети";
         }
+    }
 
-        // --- ЛОГИКА ОБЫЧНОЙ ОПЛАТЫ (С ВАЛИДАЦИЕЙ) ---
-        async function handlePaymentClick() {
-            const terminalId = document.getElementById('terminal-id').value;
-            const userEntered = parseFloat(document.getElementById('payment-input').value);
-            const statusText = document.getElementById('status-text');
+    // 2. Логика оплаты улыбкой
+    async function startSmilePayment() {
+        if (!modelsLoaded) return alert("Подождите, нейросеть еще загружается...");
+        const terminalId = document.getElementById('terminal-id').value;
+        if (!terminalId) return alert("Сначала введите ID терминала!");
 
-            // 1. Проверка на наличие ID терминала
-            if (!terminalId || terminalId.length < 5) {
-                statusText.style.color = "red";
-                statusText.innerText = "Ошибка: Сначала введите ID терминала!";
-                return; // Останавливаем выполнение функции
-            }
+        const camContainer = document.getElementById('camera-container');
+        const video = document.getElementById('video');
+        const timerDiv = document.getElementById('timer-overlay');
+        const statusText = document.getElementById('status-text');
 
-            // 2. Проверка на корректность суммы оплаты
-            if (isNaN(userEntered) || userEntered <= 0) {
-                statusText.style.color = "red";
-                statusText.innerText = "Ошибка: Сначала введите сумму оплаты!";
-                return; // Останавливаем выполнение функции
-            }
-            
-            // Если обе проверки пройдены, продолжаем процесс оплаты
-            processFinalPayment(terminalId, userEntered);
-        }
+        camContainer.style.display = "block";
+        
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
 
-        // --- ЛОГИКА ОПЛАТЫ ПО УЛЫБКЕ (УЛУЧШЕННАЯ) ---
-        async function startSmilePayment() {
-            const terminalId = document.getElementById('terminal-id').value;
-            if (!terminalId) return alert("Сначала введите ID терминала!");
+            video.addEventListener('play', () => {
+                let smileHistory = [];
+                const START_TIME = Date.now();
+                const DURATION = 3500; // 3.5 секунды на анализ
 
-            const camContainer = document.getElementById('camera-container');
-            const video = document.getElementById('video');
-            const timerDiv = document.getElementById('timer-overlay');
-            const statusText = document.getElementById('status-text');
+                const scan = setInterval(async () => {
+                    const detection = await faceapi.detectSingleFace(video).withFaceExpressions();
+                    
+                    if (detection) {
+                        const happiness = detection.expressions.happy;
+                        smileHistory.push(happiness);
+                        // Визуальная подсказка в реальном времени
+                        statusText.innerText = happiness > 0.7 ? "Отлично, считываю улыбку..." : "Улыбнитесь для оплаты!";
+                        statusText.style.color = happiness > 0.7 ? "#00ff41" : "black";
+                    }
 
-            camContainer.style.display = "block";
-            statusText.innerText = "Инициализация камеры...";
+                    const timeLeft = Math.ceil((DURATION - (Date.now() - START_TIME)) / 1000);
+                    timerDiv.innerText = timeLeft > 0 ? timeLeft : "";
 
-            let stream = null;
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                video.srcObject = stream;
-                statusText.innerText = "Смотрите в камеру и улыбайтесь!";
+                    if (Date.now() - START_TIME >= DURATION) {
+                        clearInterval(scan);
+                        stopCamera(stream);
 
-                // Добавляем обработчик 'play' для начала сканирования только после старта видео
-                video.addEventListener('play', async () => {
-                    let happinessDetections = [];
-                    const SCAN_DURATION = 3000; // 3 секунды
-                    const scanStartTime = Date.now();
+                        // Проверка: средняя "интенсивность" улыбки за период должна быть выше 60%
+                        const avgSmile = smileHistory.length > 0 ? 
+                            smileHistory.reduce((a, b) => a + b) / smileHistory.length : 0;
 
-                    // Непрерывное сканирование во время работы камеры
-                    const scanInterval = setInterval(async () => {
-                        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
-                        if (detections.length > 0) {
-                            happinessDetections.push(detections.expressions.happy);
-                        }
-
-                        // Обновляем таймер
-                        const timeLeft = Math.ceil((SCAN_DURATION - (Date.now() - scanStartTime)) / 1000);
-                        timerDiv.innerText = timeLeft > 0 ? timeLeft : "";
-
-                        // Если время истекло, анализируем результаты
-                        if (Date.now() - scanStartTime > SCAN_DURATION) {
-                            clearInterval(scanInterval);
-                            stopCamera(stream); // Останавливаем камеру после сканирования
-
-                            const smileCount = happinessDetections.filter(score => score > 0.7).length;
-                            const requiredSmiles = Math.ceil(happinessDetections.length * 0.5); // Требуем улыбку в 50% кадров
-
-                            if (smileCount >= requiredSmiles) {
-                                // Улыбка подтверждена, получаем сумму и обрабатываем платеж
-                                const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
-                                const data = await response.json();
-                                if (data && data.requiredAmount) {
-                                    processFinalPayment(terminalId, data.requiredAmount);
-                                } else {
-                                    statusText.style.color = "red";
-                                    statusText.innerText = "❌ Не удалось получить сумму заказа с терминала.";
-                                }
+                        if (avgSmile > 0.6) {
+                            // Если улыбка подтверждена, запрашиваем сумму с сервера
+                            const res = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
+                            const data = await res.json();
+                            if (data && data.requiredAmount) {
+                                processFinalPayment(terminalId, data.requiredAmount);
                             } else {
-                                statusText.style.color = "red";
-                                statusText.innerText = "❌ Улыбка не была зафиксирована. Попробуйте еще раз.";
+                                statusText.innerText = "❌ Заказ не найден на терминале";
                             }
+                        } else {
+                            statusText.style.color = "red";
+                            statusText.innerText = "❌ Улыбка не распознана. Попробуйте еще раз";
                         }
-                    }, 200); // Проверяем каждые 200мс (5 раз в секунду)
-
-                });
-
-            } catch (err) {
-                alert("Нет доступа к камере: " + err.message);
-                if (stream) stopCamera(stream);
-            }
+                    }
+                }, 100);
+            });
+        } catch (err) {
+            alert("Камера недоступна");
         }
+    }
 
-        // --- ГЛАВНАЯ ФУНКЦИЯ ОБРАБОТКИ ПЛАТЕЖА С ПРОВЕРКОЙ СУММЫ ---
-        async function processFinalPayment(terminalId, amount) {
-            const statusText = document.getElementById('status-text');
-            try {
-                const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
-                const data = await response.json();
-                
-                if (!data) return alert("Терминал не найден или заказ закрыт");
+    // 3. Обработка платежа (как вы просили, с проверкой суммы)
+    async function processFinalPayment(terminalId, amount) {
+        const statusText = document.getElementById('status-text');
+        try {
+            const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
+            const data = await response.json();
+            
+            if (!data) return alert("Терминал не найден или заказ закрыт");
 
-                const requiredAmount = parseFloat(data.requiredAmount);
-                
-                // *** ВОТ ДОБАВЛЕННАЯ ПРОВЕРКА СУММЫ ***
-                if (amount < requiredAmount) {
-                    statusText.style.color = "red";
-                    // Ваше сообщение, как вы просили
-                    statusText.innerText = "❌ Недостаточно средств. Требуется " + requiredAmount.toFixed(2) + " РУБ.";
-                    document.getElementById('camera-container').style.display = "none";
-                    return; // Прекращаем выполнение функции, если средств недостаточно
-                }
-
-                // Если сумма достаточна, продолжаем и обновляем статус
-                await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ state: "SUCCESS", paidAmount: amount, requiredAmount: requiredAmount })
-                });
-
-                statusText.style.color = "green";
-                statusText.innerText = "✅ Оплата успешно подтверждена!";
+            const requiredAmount = parseFloat(data.requiredAmount);
+            
+            if (amount < requiredAmount) {
+                statusText.style.color = "red";
+                statusText.innerText = "❌ Недостаточно средств. Требуется " + requiredAmount.toFixed(2) + " РУБ.";
                 document.getElementById('camera-container').style.display = "none";
-            } catch (e) {
-                alert("Ошибка сети при обработке платежа.");
-                console.error(e);
+                return;
             }
-        }
 
-        function stopCamera(stream) {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
+            // Успешная транзакция
+            await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
+                method: 'PATCH', // Используем PATCH для обновления только нужных полей
+                body: JSON.stringify({ 
+                    state: "SUCCESS", 
+                    paidAmount: amount,
+                    lastPaymentType: "smile"
+                })
+            });
+
+            statusText.style.color = "green";
+            statusText.innerText = "✅ Оплата успешно подтверждена!";
             document.getElementById('camera-container').style.display = "none";
+        } catch (e) {
+            alert("Ошибка сети при обработке платежа.");
         }
-    </script>       
+    }
+
+    function stopCamera(stream) {
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        document.getElementById('camera-container').style.display = "none";
+    }
+
+    // Для обычной кнопки оплаты
+    async function handlePaymentClick() {
+        const terminalId = document.getElementById('terminal-id').value;
+        const userEntered = parseFloat(document.getElementById('payment-input').value);
+        if (!terminalId || isNaN(userEntered)) return alert("Заполните ID и сумму");
+        processFinalPayment(terminalId, userEntered);
+    }
+</script>      
 </body>
 </html>
