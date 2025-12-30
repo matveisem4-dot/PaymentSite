@@ -2,13 +2,30 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Оплата заказа</title>
+    <title>Оплата заказа </title>
     <style>
-        body { font-family: sans-serif; text-align: center; padding-top: 20px; background-color: #f4f4f4; }
-        .container { max-width: 400px; margin: auto; border: 1px solid #ccc; padding: 30px; border-radius: 15px; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body { 
+            font-family: sans-serif; 
+            text-align: center; 
+            padding-top: 20px; 
+            /* Новый красивый зеленый фон */
+            background: linear-gradient(to bottom, #004d25, #008000, #4CAF50);
+            color: white; /* Белый текст для контраста */
+            position: relative;
+            min-height: 100vh;
+        }
+        .container { 
+            max-width: 400px; 
+            margin: auto; 
+            border: 1px solid rgba(255, 255, 255, 0.2); 
+            padding: 30px; 
+            border-radius: 15px; 
+            background: rgba(0, 0, 0, 0.4); /* Полупрозрачный черный фон для контейнера */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
+        }
         .input-group { margin-bottom: 20px; text-align: left; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input { padding: 12px; font-size: 16px; width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; }
+        input { padding: 12px; font-size: 16px; width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; color: black; }
         
         button { padding: 15px; font-size: 16px; border: none; cursor: pointer; width: 100%; font-weight: bold; border-radius: 5px; margin-top: 10px; transition: 0.3s; }
         .btn-card { background-color: #007bff; color: white; }
@@ -18,6 +35,15 @@
         #camera-container { display: none; margin-top: 20px; position: relative; }
         video { width: 100%; border-radius: 10px; background: #000; transform: scaleX(-1); } /* Отражаем для удобства */
         #timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 80px; color: white; font-weight: bold; text-shadow: 0 0 20px rgba(0,0,0,0.8); pointer-events: none; }
+        
+        /* Стиль для изображения СберКота */
+        #sberkot-image {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 150px;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -50,15 +76,16 @@
         <p id="status-text" style="margin-top: 15px; font-weight: bold;">Система готова</p>
     </div>
 
+    <!-- Изображение СберКота добавлено сюда -->
+    <img id="sberkot-image" src="i.ibb.co" alt="СберКот" />
+
     <script>
         const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
-        // Функция-задержка для использования с async/await
         function delay(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        // Функция остановки камеры
         function stopCamera(stream) {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
@@ -80,30 +107,24 @@
             statusText.innerText = "Инициализация камеры...";
 
             try {
-                // Включаем камеру
                 stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 video.srcObject = stream;
                 camContainer.style.display = "block";
 
-                // Ждем пока видео начнет проигрываться
                 await new Promise(resolve => video.onloadedmetadata = resolve);
 
-                // Запускаем 5-секундный таймер
                 for (let i = 5; i > 0; i--) {
                     timerDiv.innerText = i;
-                    await delay(1000); // Ждем 1 секунду
+                    await delay(1000);
                 }
                 timerDiv.innerText = "";
 
-                // После завершения таймера останавливаем камеру и отправляем сигнал
                 stopCamera(stream);
                 
-                // Получаем сумму с терминала, чтобы отправить ее обратно как оплаченную
                 const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
                 const data = await response.json();
                 const requiredAmount = parseFloat(data?.requiredAmount || document.getElementById('payment-input').value);
 
-                // Отправляем сигнал успешной оплаты в терминал
                 await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
                     method: 'PATCH',
                     body: JSON.stringify({ 
@@ -134,7 +155,6 @@
                 return;
             }
             
-            // Здесь просто обновляем статус напрямую без лишних проверок
              await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
                     method: 'PATCH',
                     body: JSON.stringify({ 
