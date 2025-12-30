@@ -107,7 +107,7 @@
                         // Проверка улыбки
                         const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
                         
-                        if (detections.length > 0 && detections[0].expressions.happy > 0.7) {
+                        if (detections.length > 0 && detections[0].expressions.happy > 0.5) {
                             // Улыбка найдена — получаем нужную сумму и оплачиваем
                             const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
                             const data = await response.json();
