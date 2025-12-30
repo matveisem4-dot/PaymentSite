@@ -2,9 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Оплата заказа</title>
-    <!-- Подключаем нейросеть face-api.js -->
-    <script defer src="cdn.jsdelivr.net"></script>
+    <title>Оплата заказа (Таймер)</title>
     <style>
         body { font-family: sans-serif; text-align: center; padding-top: 20px; background-color: #f4f4f4; }
         .container { max-width: 400px; margin: auto; border: 1px solid #ccc; padding: 30px; border-radius: 15px; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -28,170 +26,127 @@
         
         <div class="input-group">
             <label for="terminal-id">ID ТЕРМИНАЛА:</label>
-            <input type="number" id="terminal-id" placeholder="123456">
+            <input type="number" id="terminal-id" placeholder="123456" value="123456">
         </div>
 
         <div id="manual-pay-section">
             <div class="input-group">
                 <label for="payment-input">СУММА ОПЛАТЫ (РУБ):</label>
-                <input type="number" id="payment-input" placeholder="0.00" step="0.01">
+                <input type="number" id="payment-input" placeholder="0.00" step="0.01" value="100.00">
             </div>
             <button class="btn-card" onclick="handlePaymentClick()">ОПЛАТИТЬ КАРТОЙ</button>
         </div>
 
         <hr style="margin: 20px 0; border: 0.5px solid #eee;">
         
-        <button class="btn-smile" onclick="startSmilePayment()">ОПЛАТИТЬ УЛЫБКОЙ</button>
+        <button class="btn-smile" onclick="startTimerPayment()">ОПЛАТИТЬ УЛЫБКОЙ</button>
 
         <div id="camera-container">
             <video id="video" autoplay muted playsinline></video>
             <div id="timer-overlay"></div>
-            <p id="camera-instruction">Улыбнитесь для подтверждения!</p>
+            <p id="camera-instruction">Идет подтверждение (таймер)...</p>
         </div>
 
-        <p id="status-text" style="margin-top: 15px; font-weight: bold;"></p>
+        <p id="status-text" style="margin-top: 15px; font-weight: bold;">Система готова</p>
     </div>
 
-<script>
-    const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
-    let modelsLoaded = false;
+    <script>
+        const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
-    // Автозагрузка при старте
-    window.onload = () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('id')) document.getElementById('terminal-id').value = urlParams.get('id');
-        loadModels();
-    };
-
-    // 1. Улучшенная загрузка тяжелых моделей для высокой точности
-    async function loadModels() {
-        const statusText = document.getElementById('status-text');
-        const MODEL_URL = 'raw.githubusercontent.com';
-        try {
-            // Используем SSD Mobilenet v1 для исключения ложных срабатываний
-            await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
-            await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
-            modelsLoaded = true;
-            statusText.innerText = "Система распознавания готова";
-        } catch (err) {
-            console.error("Ошибка загрузки ИИ:", err);
-            statusText.innerText = "Ошибка загрузки нейросети";
+        // Функция-задержка для использования с async/await
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
         }
-    }
 
-    // 2. Логика оплаты улыбкой
-    async function startSmilePayment() {
-        if (!modelsLoaded) return alert("Подождите, нейросеть еще загружается...");
-        const terminalId = document.getElementById('terminal-id').value;
-        if (!terminalId) return alert("Сначала введите ID терминала!");
-
-        const camContainer = document.getElementById('camera-container');
-        const video = document.getElementById('video');
-        const timerDiv = document.getElementById('timer-overlay');
-        const statusText = document.getElementById('status-text');
-
-        camContainer.style.display = "block";
-        
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-
-            video.addEventListener('play', () => {
-                let smileHistory = [];
-                const START_TIME = Date.now();
-                const DURATION = 3500; // 3.5 секунды на анализ
-
-                const scan = setInterval(async () => {
-                    const detection = await faceapi.detectSingleFace(video).withFaceExpressions();
-                    
-                    if (detection) {
-                        const happiness = detection.expressions.happy;
-                        smileHistory.push(happiness);
-                        // Визуальная подсказка в реальном времени
-                        statusText.innerText = happiness > 0.7 ? "Отлично, считываю улыбку..." : "Улыбнитесь для оплаты!";
-                        statusText.style.color = happiness > 0.7 ? "#00ff41" : "black";
-                    }
-
-                    const timeLeft = Math.ceil((DURATION - (Date.now() - START_TIME)) / 1000);
-                    timerDiv.innerText = timeLeft > 0 ? timeLeft : "";
-
-                    if (Date.now() - START_TIME >= DURATION) {
-                        clearInterval(scan);
-                        stopCamera(stream);
-
-                        // Проверка: средняя "интенсивность" улыбки за период должна быть выше 60%
-                        const avgSmile = smileHistory.length > 0 ? 
-                            smileHistory.reduce((a, b) => a + b) / smileHistory.length : 0;
-
-                        if (avgSmile > 0.6) {
-                            // Если улыбка подтверждена, запрашиваем сумму с сервера
-                            const res = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
-                            const data = await res.json();
-                            if (data && data.requiredAmount) {
-                                processFinalPayment(terminalId, data.requiredAmount);
-                            } else {
-                                statusText.innerText = "❌ Заказ не найден на терминале";
-                            }
-                        } else {
-                            statusText.style.color = "red";
-                            statusText.innerText = "❌ Улыбка не распознана. Попробуйте еще раз";
-                        }
-                    }
-                }, 100);
-            });
-        } catch (err) {
-            alert("Камера недоступна");
+        // Функция остановки камеры
+        function stopCamera(stream) {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            document.getElementById('camera-container').style.display = "none";
         }
-    }
 
-    // 3. Обработка платежа (как вы просили, с проверкой суммы)
-    async function processFinalPayment(terminalId, amount) {
-        const statusText = document.getElementById('status-text');
-        try {
-            const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
-            const data = await response.json();
-            
-            if (!data) return alert("Терминал не найден или заказ закрыт");
+        // --- ЛОГИКА ОПЛАТЫ ПО ТАЙМЕРУ ---
+        async function startTimerPayment() {
+            const terminalId = document.getElementById('terminal-id').value;
+            if (!terminalId) return alert("Сначала введите ID терминала!");
 
-            const requiredAmount = parseFloat(data.requiredAmount);
-            
-            if (amount < requiredAmount) {
+            const camContainer = document.getElementById('camera-container');
+            const video = document.getElementById('video');
+            const timerDiv = document.getElementById('timer-overlay');
+            const statusText = document.getElementById('status-text');
+            let stream = null;
+
+            statusText.innerText = "Инициализация камеры...";
+
+            try {
+                // Включаем камеру
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                camContainer.style.display = "block";
+
+                // Ждем пока видео начнет проигрываться
+                await new Promise(resolve => video.onloadedmetadata = resolve);
+
+                // Запускаем 5-секундный таймер
+                for (let i = 5; i > 0; i--) {
+                    timerDiv.innerText = i;
+                    await delay(1000); // Ждем 1 секунду
+                }
+                timerDiv.innerText = "";
+
+                // После завершения таймера останавливаем камеру и отправляем сигнал
+                stopCamera(stream);
+                
+                // Получаем сумму с терминала, чтобы отправить ее обратно как оплаченную
+                const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
+                const data = await response.json();
+                const requiredAmount = parseFloat(data?.requiredAmount || document.getElementById('payment-input').value);
+
+                // Отправляем сигнал успешной оплаты в терминал
+                await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ 
+                        state: "SUCCESS", 
+                        paidAmount: requiredAmount,
+                        lastPaymentType: "timer"
+                    })
+                });
+
+                statusText.style.color = "green";
+                statusText.innerText = "✅ Оплата по таймеру успешно подтверждена!";
+
+            } catch (err) {
+                alert("Нет доступа к камере или ошибка сети: " + err.message);
+                if (stream) stopCamera(stream);
+            }
+        }
+
+        // --- ЛОГИКА ОБЫЧНОЙ ОПЛАТЫ (С ВАЛИДАЦИЕЙ) ---
+        async function handlePaymentClick() {
+            const terminalId = document.getElementById('terminal-id').value;
+            const userEntered = parseFloat(document.getElementById('payment-input').value);
+            const statusText = document.getElementById('status-text');
+
+            if (!terminalId || isNaN(userEntered) || userEntered <= 0) {
                 statusText.style.color = "red";
-                statusText.innerText = "❌ Недостаточно средств. Требуется " + requiredAmount.toFixed(2) + " РУБ.";
-                document.getElementById('camera-container').style.display = "none";
+                statusText.innerText = "Ошибка: Введите корректные данные.";
                 return;
             }
-
-            // Успешная транзакция
-            await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
-                method: 'PATCH', // Используем PATCH для обновления только нужных полей
-                body: JSON.stringify({ 
-                    state: "SUCCESS", 
-                    paidAmount: amount,
-                    lastPaymentType: "smile"
-                })
-            });
-
+            
+            // Здесь просто обновляем статус напрямую без лишних проверок
+             await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ 
+                        state: "SUCCESS", 
+                        paidAmount: userEntered,
+                        lastPaymentType: "card"
+                    })
+                });
             statusText.style.color = "green";
-            statusText.innerText = "✅ Оплата успешно подтверждена!";
-            document.getElementById('camera-container').style.display = "none";
-        } catch (e) {
-            alert("Ошибка сети при обработке платежа.");
+            statusText.innerText = "✅ Оплата картой прошла успешно!";
         }
-    }
 
-    function stopCamera(stream) {
-        if (stream) stream.getTracks().forEach(track => track.stop());
-        document.getElementById('camera-container').style.display = "none";
-    }
-
-    // Для обычной кнопки оплаты
-    async function handlePaymentClick() {
-        const terminalId = document.getElementById('terminal-id').value;
-        const userEntered = parseFloat(document.getElementById('payment-input').value);
-        if (!terminalId || isNaN(userEntered)) return alert("Заполните ID и сумму");
-        processFinalPayment(terminalId, userEntered);
-    }
-</script>      
+    </script>       
 </body>
 </html>
