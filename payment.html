@@ -2,15 +2,14 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Оплата заказа </title>
+    <title>Оплата заказа (Таймер)</title>
     <style>
         body { 
             font-family: sans-serif; 
             text-align: center; 
             padding-top: 20px; 
-            /* Новый красивый зеленый фон */
             background: linear-gradient(to bottom, #004d25, #008000, #4CAF50);
-            color: white; /* Белый текст для контраста */
+            color: white;
             position: relative;
             min-height: 100vh;
         }
@@ -20,12 +19,24 @@
             border: 1px solid rgba(255, 255, 255, 0.2); 
             padding: 30px; 
             border-radius: 15px; 
-            background: rgba(0, 0, 0, 0.4); /* Полупрозрачный черный фон для контейнера */
+            background: rgba(0, 0, 0, 0.4);
             box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
         }
         .input-group { margin-bottom: 20px; text-align: left; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input { padding: 12px; font-size: 16px; width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; color: black; }
+        
+        /* Стили для полей ввода: черный фон, красный текст */
+        input { 
+            padding: 12px; 
+            font-size: 16px; 
+            width: 100%; 
+            box-sizing: border-box; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+            background-color: black; 
+            color: red; /* Красные цифры */
+            caret-color: red; /* Красный курсор */
+        }
         
         button { padding: 15px; font-size: 16px; border: none; cursor: pointer; width: 100%; font-weight: bold; border-radius: 5px; margin-top: 10px; transition: 0.3s; }
         .btn-card { background-color: #007bff; color: white; }
@@ -33,15 +44,14 @@
         
         /* Стили камеры */
         #camera-container { display: none; margin-top: 20px; position: relative; }
-        video { width: 100%; border-radius: 10px; background: #000; transform: scaleX(-1); } /* Отражаем для удобства */
+        video { width: 100%; border-radius: 10px; background: #000; transform: scaleX(-1); }
         #timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 80px; color: white; font-weight: bold; text-shadow: 0 0 20px rgba(0,0,0,0.8); pointer-events: none; }
         
-        /* Стиль для изображения СберКота */
         #sberkot-image {
             position: absolute;
             bottom: 20px;
             right: 20px;
-            width: 150px;
+            width: 100px;
             pointer-events: none;
         }
     </style>
@@ -76,7 +86,6 @@
         <p id="status-text" style="margin-top: 15px; font-weight: bold;">Система готова</p>
     </div>
 
-    <!-- Изображение СберКота добавлено сюда -->
     <img id="sberkot-image" src="https://free-png.ru/wp-content/uploads/2020/09/icon_sber-01.png" alt="СберКот" />
 
     <script>
@@ -93,80 +102,57 @@
             document.getElementById('camera-container').style.display = "none";
         }
 
-        // --- ЛОГИКА ОПЛАТЫ ПО ТАЙМЕРУ ---
         async function startTimerPayment() {
             const terminalId = document.getElementById('terminal-id').value;
             if (!terminalId) return alert("Сначала введите ID терминала!");
-
             const camContainer = document.getElementById('camera-container');
             const video = document.getElementById('video');
             const timerDiv = document.getElementById('timer-overlay');
             const statusText = document.getElementById('status-text');
             let stream = null;
-
             statusText.innerText = "Инициализация камеры...";
-
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 video.srcObject = stream;
                 camContainer.style.display = "block";
-
                 await new Promise(resolve => video.onloadedmetadata = resolve);
-
                 for (let i = 5; i > 0; i--) {
                     timerDiv.innerText = i;
                     await delay(1000);
                 }
                 timerDiv.innerText = "";
-
                 stopCamera(stream);
-                
                 const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
                 const data = await response.json();
                 const requiredAmount = parseFloat(data?.requiredAmount || document.getElementById('payment-input').value);
-
                 await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
                     method: 'PATCH',
-                    body: JSON.stringify({ 
-                        state: "SUCCESS", 
-                        paidAmount: requiredAmount,
-                        lastPaymentType: "timer"
-                    })
+                    body: JSON.stringify({ state: "SUCCESS", paidAmount: requiredAmount, lastPaymentType: "timer" })
                 });
-
                 statusText.style.color = "green";
-                statusText.innerText = "✅ Оплата по улыбке успешно подтверждена!";
-
+                statusText.innerText = "✅ Оплата по таймеру успешно подтверждена!";
             } catch (err) {
                 alert("Нет доступа к камере или ошибка сети: " + err.message);
                 if (stream) stopCamera(stream);
             }
         }
 
-        // --- ЛОГИКА ОБЫЧНОЙ ОПЛАТЫ (С ВАЛИДАЦИЕЙ) ---
         async function handlePaymentClick() {
             const terminalId = document.getElementById('terminal-id').value;
             const userEntered = parseFloat(document.getElementById('payment-input').value);
             const statusText = document.getElementById('status-text');
-
             if (!terminalId || isNaN(userEntered) || userEntered <= 0) {
                 statusText.style.color = "red";
                 statusText.innerText = "Ошибка: Введите корректные данные.";
                 return;
             }
-            
              await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
                     method: 'PATCH',
-                    body: JSON.stringify({ 
-                        state: "SUCCESS", 
-                        paidAmount: userEntered,
-                        lastPaymentType: "card"
-                    })
+                    body: JSON.stringify({ state: "SUCCESS", paidAmount: userEntered, lastPaymentType: "card" })
                 });
             statusText.style.color = "green";
             statusText.innerText = "✅ Оплата картой прошла успешно!";
         }
-
     </script>       
 </body>
 </html>
