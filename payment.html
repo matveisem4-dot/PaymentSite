@@ -92,7 +92,7 @@
             processFinalPayment(terminalId, userEntered);
         }
 
-        // --- ЛОГИКА ОПЛАТЫ ПО УЛЫБКЕ ---
+        // --- ЛОГИКА ОПЛАТЫ ПО УЛЫБКЕ (УЛУЧШЕННАЯ) ---
         async function startSmilePayment() {
             const terminalId = document.getElementById('terminal-id').value;
             if (!terminalId) return alert("Сначала введите ID терминала!");
@@ -105,45 +105,59 @@
             camContainer.style.display = "block";
             statusText.innerText = "Инициализация камеры...";
 
+            let stream = null;
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 video.srcObject = stream;
+                statusText.innerText = "Смотрите в камеру и улыбайтесь!";
 
-                let count = 3;
-                timerDiv.innerText = count;
+                // Добавляем обработчик 'play' для начала сканирования только после старта видео
+                video.addEventListener('play', async () => {
+                    let happinessDetections = [];
+                    const SCAN_DURATION = 3000; // 3 секунды
+                    const scanStartTime = Date.now();
 
-                const timerInterval = setInterval(async () => {
-                    count--;
-                    if (count > 0) {
-                        timerDiv.innerText = count;
-                    } else {
-                        clearInterval(timerInterval);
-                        timerDiv.innerText = "";
-                        statusText.innerText = "Сканирование улыбки...";
-                        
+                    // Непрерывное сканирование во время работы камеры
+                    const scanInterval = setInterval(async () => {
                         const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
-                        
-                        if (detections.length > 0 && detections.expressions.happy > 0.7) {
-                            // Для оплаты улыбкой мы берем requiredAmount из статуса Firebase
-                            const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
-                            const data = await response.json();
-                            if (data && data.requiredAmount) {
-                                processFinalPayment(terminalId, data.requiredAmount);
+                        if (detections.length > 0) {
+                            happinessDetections.push(detections.expressions.happy);
+                        }
+
+                        // Обновляем таймер
+                        const timeLeft = Math.ceil((SCAN_DURATION - (Date.now() - scanStartTime)) / 1000);
+                        timerDiv.innerText = timeLeft > 0 ? timeLeft : "";
+
+                        // Если время истекло, анализируем результаты
+                        if (Date.now() - scanStartTime > SCAN_DURATION) {
+                            clearInterval(scanInterval);
+                            stopCamera(stream); // Останавливаем камеру после сканирования
+
+                            const smileCount = happinessDetections.filter(score => score > 0.7).length;
+                            const requiredSmiles = Math.ceil(happinessDetections.length * 0.5); // Требуем улыбку в 50% кадров
+
+                            if (smileCount >= requiredSmiles) {
+                                // Улыбка подтверждена, получаем сумму и обрабатываем платеж
+                                const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
+                                const data = await response.json();
+                                if (data && data.requiredAmount) {
+                                    processFinalPayment(terminalId, data.requiredAmount);
+                                } else {
+                                    statusText.style.color = "red";
+                                    statusText.innerText = "❌ Не удалось получить сумму заказа с терминала.";
+                                }
                             } else {
                                 statusText.style.color = "red";
-                                statusText.innerText = "❌ Не удалось получить сумму заказа с терминала.";
-                                stopCamera(stream);
+                                statusText.innerText = "❌ Улыбка не была зафиксирована. Попробуйте еще раз.";
                             }
-                        } else {
-                            statusText.style.color = "red";
-                            statusText.innerText = "❌ Вы не улыбнулись! Попробуйте еще раз.";
-                            stopCamera(stream);
                         }
-                    }
-                }, 1000);
+                    }, 200); // Проверяем каждые 200мс (5 раз в секунду)
+
+                });
 
             } catch (err) {
-                alert("Нет доступа к камере");
+                alert("Нет доступа к камере: " + err.message);
+                if (stream) stopCamera(stream);
             }
         }
 
@@ -183,7 +197,9 @@
         }
 
         function stopCamera(stream) {
-            stream.getTracks().forEach(track => track.stop());
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
             document.getElementById('camera-container').style.display = "none";
         }
     </script>       
