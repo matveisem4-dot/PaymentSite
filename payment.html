@@ -124,9 +124,16 @@
                         const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
                         
                         if (detections.length > 0 && detections.expressions.happy > 0.7) {
+                            // Для оплаты улыбкой мы берем requiredAmount из статуса Firebase
                             const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
                             const data = await response.json();
-                            processFinalPayment(terminalId, data.requiredAmount);
+                            if (data && data.requiredAmount) {
+                                processFinalPayment(terminalId, data.requiredAmount);
+                            } else {
+                                statusText.style.color = "red";
+                                statusText.innerText = "❌ Не удалось получить сумму заказа с терминала.";
+                                stopCamera(stream);
+                            }
                         } else {
                             statusText.style.color = "red";
                             statusText.innerText = "❌ Вы не улыбнулись! Попробуйте еще раз.";
@@ -140,24 +147,38 @@
             }
         }
 
+        // --- ГЛАВНАЯ ФУНКЦИЯ ОБРАБОТКИ ПЛАТЕЖА С ПРОВЕРКОЙ СУММЫ ---
         async function processFinalPayment(terminalId, amount) {
             const statusText = document.getElementById('status-text');
             try {
                 const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
                 const data = await response.json();
                 
-                if (!data) return alert("Терминал не найден");
+                if (!data) return alert("Терминал не найден или заказ закрыт");
 
+                const requiredAmount = parseFloat(data.requiredAmount);
+                
+                // *** ВОТ ДОБАВЛЕННАЯ ПРОВЕРКА СУММЫ ***
+                if (amount < requiredAmount) {
+                    statusText.style.color = "red";
+                    // Ваше сообщение, как вы просили
+                    statusText.innerText = "❌ Недостаточно средств. Требуется " + requiredAmount.toFixed(2) + " РУБ.";
+                    document.getElementById('camera-container').style.display = "none";
+                    return; // Прекращаем выполнение функции, если средств недостаточно
+                }
+
+                // Если сумма достаточна, продолжаем и обновляем статус
                 await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
                     method: 'PUT',
-                    body: JSON.stringify({ state: "SUCCESS", paidAmount: amount })
+                    body: JSON.stringify({ state: "SUCCESS", paidAmount: amount, requiredAmount: requiredAmount })
                 });
 
                 statusText.style.color = "green";
                 statusText.innerText = "✅ Оплата успешно подтверждена!";
                 document.getElementById('camera-container').style.display = "none";
             } catch (e) {
-                alert("Ошибка сети");
+                alert("Ошибка сети при обработке платежа.");
+                console.error(e);
             }
         }
 
