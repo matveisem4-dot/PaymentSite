@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Оплата заказа</title>
+    <title>Оплата заказа 2026</title>
     <style>
         html { font-size: 16px; }
         body { 
@@ -11,10 +11,9 @@
             margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; 
         }
         .container { 
-            /* Фиксированные размеры для прямоугольного экрана */
             width: 380px; 
             height: 600px;
-            max-width: 90%; /* Адаптивность для очень маленьких экранов */
+            max-width: 90%; 
             border: 1px solid rgba(255, 255, 255, 0.2); 
             padding: 1.5rem; 
             border-radius: 15px; 
@@ -29,25 +28,20 @@
         input { 
             padding: 0.75rem; font-size: 1rem; width: 100%; box-sizing: border-box; 
             border: 1px solid #ddd; border-radius: 5px; background-color: black; 
-            color: red; caret-color: red;
-        }
-
-        #card-number-input {
-             color: white;
-             background-color: #1a1a1a;
-             font-size: 1rem;
+            color: #00ff41; caret-color: #00ff41;
         }
         
         #payment-input {
             font-size: 2rem; 
             font-weight: 900; 
-            text-align: left; /* Выравнивание по левому краю, как в Сбербанке */
-            color: #00ff41; /* Яркий зеленый цвет */
+            text-align: left; 
+            color: #00ff41; 
             background-color: #1a1a1a; 
             caret-color: #00ff41;
         }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
+        
         button { 
             padding: 1rem; font-size: 1rem; border: none; cursor: pointer; width: 100%; 
             font-weight: bold; border-radius: 5px; margin-top: 0.75rem; 
@@ -56,12 +50,8 @@
         .btn-card { background-color: #007bff; color: white; }
         button:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0, 123, 255, 0.5); }
         button:active { transform: translateY(1px); box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3); }
+        
         #status-text { margin-top: 1rem; font-weight: bold; font-size: 0.9rem; }
-        @media (max-width: 400px) {
-            html { font-size: 14px; }
-            .container { padding: 1rem; }
-            #payment-input { font-size: 1.5rem; }
-        }
 
         .modal {
             display: none; position: fixed; z-index: 1; left: 0; top: 0;
@@ -88,7 +78,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Оплата заказа 2025</h1>
+        <h1>Оплата заказа 2026</h1>
         
         <div class="input-group">
             <label for="terminal-id">ID ТЕРМИНАЛА:</label>
@@ -96,11 +86,6 @@
         </div>
 
         <div id="manual-pay-section">
-             <div class="input-group">
-                <label for="card-number-input">НОМЕР КАРТЫ:</label>
-                <input type="text" id="card-number-input" placeholder="0000 0000 0000 0000">
-            </div>
-
             <div class="input-group">
                 <label for="payment-input">СУММА ОПЛАТЫ (РУБ):</label>
                 <input type="number" id="payment-input" placeholder="0.00" step="0.01" value="100.00">
@@ -111,6 +96,7 @@
         <p id="status-text" style="margin-top: 15px; font-weight: bold;">Система готова</p>
     </div>
 
+    <!-- Модальные окна -->
     <div id="loading-modal" class="modal">
         <div class="spinner"></div>
         <p id="loading-text">Обработка платежа...</p>
@@ -119,7 +105,7 @@
     <div id="success-modal" class="modal">
         <div class="checkmark">✅</div>
         <p>ОПЛАЧЕНО УСПЕШНО!</p>
-        <button onclick="hideSuccessModal()" style="margin-top: 2rem;">Готово</button>
+        <button onclick="hideSuccessModal()" style="margin-top: 2rem; background-color: #00ff41; color: black;">Готово</button>
     </div>
 
     <script>
@@ -140,80 +126,73 @@
 
         function hideSuccessModal() {
             document.getElementById('success-modal').style.display = 'none';
-            document.getElementById('terminal-id').value = '';
             document.getElementById('payment-input').value = '';
-            document.getElementById('card-number-input').value = '';
+            document.getElementById('status-text').innerText = "Система готова";
+            document.getElementById('status-text').style.color = "white";
         }
 
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
             const terminalIdFromUrl = urlParams.get('id');
             const amountFromUrl = urlParams.get('amount');
-            if (terminalIdFromUrl) {
-                document.getElementById('terminal-id').value = terminalIdFromUrl;
-            }
-            if (amountFromUrl) {
-                document.getElementById('payment-input').value = amountFromUrl;
-            }
+            if (terminalIdFromUrl) document.getElementById('terminal-id').value = terminalIdFromUrl;
+            if (amountFromUrl) document.getElementById('payment-input').value = amountFromUrl;
         };
-
 
         async function handlePaymentClick() {
             const terminalId = document.getElementById('terminal-id').value;
             const userEnteredAmount = parseFloat(document.getElementById('payment-input').value);
-            const userCardNumber = document.getElementById('card-number-input').value; 
             const statusText = document.getElementById('status-text');
             
-            // ПЕРВАЯ ПРОВЕРКА (без нее не показываем загрузку)
-            if (!terminalId || isNaN(userEnteredAmount) || userEnteredAmount <= 0 || !userCardNumber) {
+            // Проверка только ID и суммы
+            if (!terminalId || isNaN(userEnteredAmount) || userEnteredAmount <= 0) {
                 statusText.style.color = "red";
-                statusText.innerText = "Ошибка: Введите корректные данные (ID, сумму и номер карты).";
-                return; // Выходим до вызова модального окна
+                statusText.innerText = "Ошибка: Введите ID терминала и сумму.";
+                return;
             }
             
-            // Если все введено правильно - показываем загрузку
             showLoadingModal('Связываюсь с банком...');
             statusText.style.color = "orange";
+            statusText.innerText = "Запрос отправлен...";
 
             try {
-                await new Promise(resolve => setTimeout(resolve, 1000)); 
+                await new Promise(resolve => setTimeout(resolve, 1500)); 
                 document.getElementById('loading-text').innerText = 'Передаю запрос на сервер...';
                 
                 const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
                 const data = await response.json();
                 
-                if (!data) { throw new Error("Терминал не найден или неактивен в Firebase."); }
+                if (!data) { throw new Error("Терминал не найден."); }
 
                 document.getElementById('loading-text').innerText = 'Ответ получен, проверка данных...';
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 800));
 
                 const expectedAmount = parseFloat(data.amount);
                 const isWaiting = data.state === "WAITING_PAYMENT";
-                const amountsMatch = userEnteredAmount === expectedAmount;
+                const amountsMatch = Math.abs(userEnteredAmount - expectedAmount) < 0.01;
 
                 if (isWaiting && !isNaN(expectedAmount) && amountsMatch) {
-                     await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
+                    await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
                         method: 'PATCH',
                         body: JSON.stringify({ 
                             state: "SUCCESS", 
                             paidAmount: userEnteredAmount, 
                             lastPaymentType: "card",
-                            lastCardDigits: userCardNumber.slice(-4) 
+                            lastCardDigits: "0000" // Заглушка вместо номера карты
                         })
                     });
                     
                     hideLoadingModal();
                     showSuccessModal(); 
-                    statusText.style.color = "green";
-                    statusText.innerText = "✅ Оплата картой прошла успешно!";
-
+                    statusText.style.color = "#00ff41";
+                    statusText.innerText = "✅ Оплата прошла успешно!";
 
                 } else if (!isWaiting) {
-                    throw new Error(`Терминал сейчас не принимает оплату (текущий статус: ${data.state}).`);
-                } else if (!isNaN(expectedAmount) && !amountsMatch) {
-                    throw new Error(`Сумма не совпадает с терминалом. Ожидается: ${expectedAmount} РУБ.`);
+                    throw new Error(`Статус терминала: ${data.state}. Ожидание оплаты не активно.`);
+                } else if (!amountsMatch) {
+                    throw new Error(`Сумма не совпадает. Ожидается: ${expectedAmount} РУБ.`);
                 } else {
-                    throw new Error("Неизвестная ошибка при проверке данных.");
+                    throw new Error("Ошибка верификации данных.");
                 }
 
             } catch (error) {
@@ -222,6 +201,6 @@
                 hideLoadingModal();
             }
         }
-    </script>       
+    </script>
 </body>
 </html>
