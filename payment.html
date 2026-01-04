@@ -2,55 +2,75 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Оплата заказа</title>
     <style>
+        html { font-size: 16px; }
         body { 
-            font-family: sans-serif; 
-            text-align: center; 
-            /* Удаляем стандартный padding-top */
-            /* background: linear-gradient(to bottom, #004d25, #008000, #4CAF50); */
-            /* Делаем фон всего экрана черным */
-            background-color: #000000; 
-            color: white;
-            
-            /* Новые стили для центрирования контента на весь экран */
-            margin: 0;
-            display: flex;
-            justify-content: center; /* Выравнивание по горизонтали */
-            align-items: center;     /* Выравнивание по вертикали */
-            min-height: 100vh;       /* Занимаем всю высоту экрана */
+            font-family: sans-serif; text-align: center; background-color: #000000; color: white;
+            margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; 
         }
         .container { 
-            max-width: 400px; 
-            /* margin: auto; */ /* margin: auto; больше не нужен благодаря flexbox */
-            border: 1px solid rgba(255, 255, 255, 0.2); 
-            padding: 30px; 
-            border-radius: 15px; 
-            /* Можно вернуть градиент внутрь контейнера, чтобы он был "полем" */
-            background: linear-gradient(to bottom, #004d25, #008000, #4CAF50);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5); /* Немного более темная тень для контраста на черном фоне */
+            width: 90%; max-width: 400px; border: 1px solid rgba(255, 255, 255, 0.2); 
+            padding: 1.5rem; border-radius: 15px; background: linear-gradient(to bottom, #004d25, #008000, #4CAF50);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5); box-sizing: border-box; 
+            display: flex; flex-direction: column; justify-content: center;
         }
-        .input-group { margin-bottom: 20px; text-align: left; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        
+        h1 { margin-top: 0; font-size: 1.5rem; } 
+        .input-group { margin-bottom: 1.25rem; text-align: left; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; font-size: 0.9rem; }
         input { 
-            padding: 12px; font-size: 16px; width: 100%; box-sizing: border-box; 
+            padding: 0.75rem; font-size: 1rem; width: 100%; box-sizing: border-box; 
             border: 1px solid #ddd; border-radius: 5px; background-color: black; 
             color: red; caret-color: red;
         }
-        
-        button { padding: 15px; font-size: 16px; border: none; cursor: pointer; width: 100%; font-weight: bold; border-radius: 5px; margin-top: 10px; transition: 0.3s; }
-        .btn-card { background-color: #007bff; color: white; }
-        
-        #sberkot-image {
-            position: absolute; bottom: 20px; right: 20px; width: 100px; pointer-events: none;
+        #payment-input {
+            font-size: 2rem; font-weight: 900; text-align: right; color: #00ff41; 
+            background-color: #1a1a1a; caret-color: #00ff41;
         }
-        
-        #status-text { margin-top: 15px; font-weight: bold; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        button { 
+            padding: 1rem; font-size: 1rem; border: none; cursor: pointer; width: 100%; 
+            font-weight: bold; border-radius: 5px; margin-top: 0.75rem; 
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4); transition: all 0.2s ease-in-out;
+        }
+        .btn-card { background-color: #007bff; color: white; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0, 123, 255, 0.5); }
+        button:active { transform: translateY(1px); box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3); }
+        #status-text { margin-top: 1rem; font-weight: bold; font-size: 0.9rem; }
+        @media (max-width: 400px) {
+            html { font-size: 14px; }
+            .container { padding: 1rem; }
+            #payment-input { font-size: 1.5rem; }
+        }
+
+        /* Стили модального окна загрузки */
+        .modal {
+            display: none; position: fixed; z-index: 1; left: 0; top: 0;
+            width: 100%; height: 100%; background-color: rgba(0,0,0,0.9);
+            justify-content: center; align-items: center; flex-direction: column;
+            color: white; font-size: 1.2rem;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
+            border-top: 4px solid #00ff41; width: 40px; height: 40px;
+            animation: spin 1s linear infinite; margin-bottom: 1rem;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Стили модального окна успеха */
+        #success-modal .checkmark {
+            font-size: 4rem; color: #00ff41; margin-bottom: 1rem;
+            opacity: 0; transform: scale(0.5);
+            animation: fadeInScale 0.5s ease-out forwards;
+        }
+        @keyframes fadeInScale {
+            to { opacity: 1; transform: scale(1); }
+        }
     </style>
 </head>
 <body>
-    <!-- Ваш остальной HTML-код остается без изменений -->
     <div class="container">
         <h1>Оплата заказа 2025</h1>
         
@@ -70,15 +90,43 @@
         <p id="status-text" style="margin-top: 15px; font-weight: bold;">Система готова</p>
     </div>
 
-    <img id="sberkot-image" src="free-png.ru" alt="СберКот" />
+    <!-- Модальное окно загрузки -->
+    <div id="loading-modal" class="modal">
+        <div class="spinner"></div>
+        <p id="loading-text">Обработка платежа...</p>
+    </div>
 
-    <!-- Ваш JavaScript остается без изменений -->
+    <!-- Модальное окно успеха -->
+    <div id="success-modal" class="modal">
+        <div class="checkmark">✅</div>
+        <p>ОПЛАЧЕНО УСПЕШНО!</p>
+        <button onclick="hideSuccessModal()" style="margin-top: 2rem;">Готово</button>
+    </div>
+
     <script>
         const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
-        // Проверяем наличие ID терминала в URL (если пользователь пришел по QR-коду)
+        function showLoadingModal(text) {
+            document.getElementById('loading-text').innerText = text || 'Обработка платежа...';
+            document.getElementById('loading-modal').style.display = 'flex';
+        }
+
+        function hideLoadingModal() {
+            document.getElementById('loading-modal').style.display = 'none';
+        }
+
+        function showSuccessModal() {
+            document.getElementById('success-modal').style.display = 'flex';
+        }
+
+        function hideSuccessModal() {
+            document.getElementById('success-modal').style.display = 'none';
+            // Сброс формы или возврат в исходное состояние можно добавить здесь
+        }
+
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
+            // ... (остальной код window.onload без изменений) ...
             const terminalIdFromUrl = urlParams.get('id');
             const amountFromUrl = urlParams.get('amount');
             if (terminalIdFromUrl) {
@@ -101,54 +149,58 @@
                 return;
             }
             
+            // 1. Показываем загрузку и обновляем статус
+            showLoadingModal('Связываюсь с банком...');
             statusText.style.color = "orange";
-            statusText.innerText = "Проверка суммы...";
 
             try {
-                // 1. Запрашиваем у Firebase статус терминала
+                // Имитация задержки 1 секунда
+                await new Promise(resolve => setTimeout(resolve, 1000)); 
+                document.getElementById('loading-text').innerText = 'Передаю запрос на сервер...';
+
+                // 2. Запрашиваем у Firebase статус терминала
                 const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
                 const data = await response.json();
                 
-                // Проверяем, удалось ли получить данные
                 if (!data) {
-                    statusText.style.color = "red";
-                    statusText.innerText = "Ошибка: Терминал не найден или неактивен в Firebase.";
-                    return;
+                    throw new Error("Терминал не найден или неактивен в Firebase.");
                 }
 
-                // 2. Проверяем ожидаемую сумму и статус
+                document.getElementById('loading-text').innerText = 'Ответ получен, проверка данных...';
+
+                // Имитация задержки 0.5 секунды
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // 3. Проверяем данные
                 const expectedAmount = parseFloat(data.amount);
                 const isWaiting = data.state === "WAITING_PAYMENT";
                 const amountsMatch = userEnteredAmount === expectedAmount;
 
                 if (isWaiting && !isNaN(expectedAmount) && amountsMatch) {
-                    // Суммы совпадают и терминал ждет оплаты - отправляем SUCCESS
+                    // 4. Успех! Отправляем статус
                      await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
                         method: 'PATCH',
                         body: JSON.stringify({ state: "SUCCESS", paidAmount: userEnteredAmount, lastPaymentType: "card" })
                     });
+                    
+                    hideLoadingModal();
+                    showSuccessModal(); // Показываем экран успеха
                     statusText.style.color = "green";
                     statusText.innerText = "✅ Оплата картой прошла успешно!";
 
-                } else if (!isWaiting) {
-                    // Если терминал не ждет оплаты (idle, success и т.д.)
-                    statusText.style.color = "red";
-                    statusText.innerText = `Ошибка: Терминал сейчас не принимает оплату (текущий статус: ${data.state}).`;
-                
-                } else if (!isNaN(expectedAmount) && !amountsMatch) {
-                    // Если суммы не совпадают - отказ
-                    statusText.style.color = "red";
-                    statusText.innerText = `Ошибка: Сумма не совпадает с терминалом. Ожидается: ${expectedAmount} РУБ.`;
 
+                } else if (!isWaiting) {
+                    throw new Error(`Терминал сейчас не принимает оплату (текущий статус: ${data.state}).`);
+                } else if (!isNaN(expectedAmount) && !amountsMatch) {
+                    throw new Error(`Сумма не совпадает с терминалом. Ожидается: ${expectedAmount} РУБ.`);
                 } else {
-                     // Непредвиденная ошибка данных
-                    statusText.style.color = "red";
-                    statusText.innerText = "Неизвестная ошибка при проверке данных.";
+                    throw new Error("Неизвестная ошибка при проверке данных.");
                 }
 
             } catch (error) {
                 statusText.style.color = "red";
-                statusText.innerText = "Ошибка связи с Firebase: " + error.message;
+                statusText.innerText = "Ошибка: " + error.message;
+                hideLoadingModal(); // Скрываем загрузку при любой ошибке
             }
         }
     </script>       
