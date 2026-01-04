@@ -11,9 +11,16 @@
             margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; 
         }
         .container { 
-            width: 90%; max-width: 400px; border: 1px solid rgba(255, 255, 255, 0.2); 
-            padding: 1.5rem; border-radius: 15px; background: linear-gradient(to bottom, #004d25, #008000, #4CAF50);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5); box-sizing: border-box; 
+            /* Фиксированные размеры для прямоугольного экрана */
+            width: 380px; 
+            height: 600px;
+            max-width: 90%; /* Адаптивность для очень маленьких экранов */
+            border: 1px solid rgba(255, 255, 255, 0.2); 
+            padding: 1.5rem; 
+            border-radius: 15px; 
+            background: linear-gradient(to bottom, #004d25, #008000, #4CAF50);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5); 
+            box-sizing: border-box; 
             display: flex; flex-direction: column; justify-content: center;
         }
         h1 { margin-top: 0; font-size: 1.5rem; } 
@@ -24,9 +31,20 @@
             border: 1px solid #ddd; border-radius: 5px; background-color: black; 
             color: red; caret-color: red;
         }
+
+        #card-number-input {
+             color: white;
+             background-color: #1a1a1a;
+             font-size: 1rem;
+        }
+        
         #payment-input {
-            font-size: 2rem; font-weight: 900; text-align: right; color: #00ff41; 
-            background-color: #1a1a1a; caret-color: #00ff41;
+            font-size: 2rem; 
+            font-weight: 900; 
+            text-align: left; /* Выравнивание по левому краю, как в Сбербанке */
+            color: #00ff41; /* Яркий зеленый цвет */
+            background-color: #1a1a1a; 
+            caret-color: #00ff41;
         }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
@@ -45,7 +63,6 @@
             #payment-input { font-size: 1.5rem; }
         }
 
-        /* Стили модального окна загрузки */
         .modal {
             display: none; position: fixed; z-index: 1; left: 0; top: 0;
             width: 100%; height: 100%; background-color: rgba(0,0,0,0.9);
@@ -59,7 +76,6 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Стили модального окна успеха */
         #success-modal .checkmark {
             font-size: 4rem; color: #00ff41; margin-bottom: 1rem;
             opacity: 0; transform: scale(0.5);
@@ -80,6 +96,11 @@
         </div>
 
         <div id="manual-pay-section">
+             <div class="input-group">
+                <label for="card-number-input">НОМЕР КАРТЫ:</label>
+                <input type="text" id="card-number-input" placeholder="0000 0000 0000 0000">
+            </div>
+
             <div class="input-group">
                 <label for="payment-input">СУММА ОПЛАТЫ (РУБ):</label>
                 <input type="number" id="payment-input" placeholder="0.00" step="0.01" value="100.00">
@@ -90,13 +111,11 @@
         <p id="status-text" style="margin-top: 15px; font-weight: bold;">Система готова</p>
     </div>
 
-    <!-- Модальное окно загрузки -->
     <div id="loading-modal" class="modal">
         <div class="spinner"></div>
         <p id="loading-text">Обработка платежа...</p>
     </div>
 
-    <!-- Модальное окно успеха -->
     <div id="success-modal" class="modal">
         <div class="checkmark">✅</div>
         <p>ОПЛАЧЕНО УСПЕШНО!</p>
@@ -121,12 +140,13 @@
 
         function hideSuccessModal() {
             document.getElementById('success-modal').style.display = 'none';
-            // Сброс формы или возврат в исходное состояние можно добавить здесь
+            document.getElementById('terminal-id').value = '';
+            document.getElementById('payment-input').value = '';
+            document.getElementById('card-number-input').value = '';
         }
 
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
-            // ... (остальной код window.onload без изменений) ...
             const terminalIdFromUrl = urlParams.get('id');
             const amountFromUrl = urlParams.get('amount');
             if (terminalIdFromUrl) {
@@ -141,50 +161,49 @@
         async function handlePaymentClick() {
             const terminalId = document.getElementById('terminal-id').value;
             const userEnteredAmount = parseFloat(document.getElementById('payment-input').value);
+            const userCardNumber = document.getElementById('card-number-input').value; 
             const statusText = document.getElementById('status-text');
-
-            if (!terminalId || isNaN(userEnteredAmount) || userEnteredAmount <= 0) {
+            
+            // ПЕРВАЯ ПРОВЕРКА (без нее не показываем загрузку)
+            if (!terminalId || isNaN(userEnteredAmount) || userEnteredAmount <= 0 || !userCardNumber) {
                 statusText.style.color = "red";
-                statusText.innerText = "Ошибка: Введите корректные данные.";
-                return;
+                statusText.innerText = "Ошибка: Введите корректные данные (ID, сумму и номер карты).";
+                return; // Выходим до вызова модального окна
             }
             
-            // 1. Показываем загрузку и обновляем статус
+            // Если все введено правильно - показываем загрузку
             showLoadingModal('Связываюсь с банком...');
             statusText.style.color = "orange";
 
             try {
-                // Имитация задержки 1 секунда
                 await new Promise(resolve => setTimeout(resolve, 1000)); 
                 document.getElementById('loading-text').innerText = 'Передаю запрос на сервер...';
-
-                // 2. Запрашиваем у Firebase статус терминала
+                
                 const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
                 const data = await response.json();
                 
-                if (!data) {
-                    throw new Error("Терминал не найден или неактивен в Firebase.");
-                }
+                if (!data) { throw new Error("Терминал не найден или неактивен в Firebase."); }
 
                 document.getElementById('loading-text').innerText = 'Ответ получен, проверка данных...';
-
-                // Имитация задержки 0.5 секунды
                 await new Promise(resolve => setTimeout(resolve, 500));
 
-                // 3. Проверяем данные
                 const expectedAmount = parseFloat(data.amount);
                 const isWaiting = data.state === "WAITING_PAYMENT";
                 const amountsMatch = userEnteredAmount === expectedAmount;
 
                 if (isWaiting && !isNaN(expectedAmount) && amountsMatch) {
-                    // 4. Успех! Отправляем статус
                      await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
                         method: 'PATCH',
-                        body: JSON.stringify({ state: "SUCCESS", paidAmount: userEnteredAmount, lastPaymentType: "card" })
+                        body: JSON.stringify({ 
+                            state: "SUCCESS", 
+                            paidAmount: userEnteredAmount, 
+                            lastPaymentType: "card",
+                            lastCardDigits: userCardNumber.slice(-4) 
+                        })
                     });
                     
                     hideLoadingModal();
-                    showSuccessModal(); // Показываем экран успеха
+                    showSuccessModal(); 
                     statusText.style.color = "green";
                     statusText.innerText = "✅ Оплата картой прошла успешно!";
 
@@ -200,7 +219,7 @@
             } catch (error) {
                 statusText.style.color = "red";
                 statusText.innerText = "Ошибка: " + error.message;
-                hideLoadingModal(); // Скрываем загрузку при любой ошибке
+                hideLoadingModal();
             }
         }
     </script>       
