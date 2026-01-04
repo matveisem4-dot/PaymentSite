@@ -25,34 +25,17 @@
         .input-group { margin-bottom: 20px; text-align: left; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
         
-        /* Стили для полей ввода: черный фон, красный текст */
         input { 
-            padding: 12px; 
-            font-size: 16px; 
-            width: 100%; 
-            box-sizing: border-box; 
-            border: 1px solid #ddd; 
-            border-radius: 5px; 
-            background-color: black; 
-            color: red; /* Красные цифры */
-            caret-color: red; /* Красный курсор */
+            padding: 12px; font-size: 16px; width: 100%; box-sizing: border-box; 
+            border: 1px solid #ddd; border-radius: 5px; background-color: black; 
+            color: red; caret-color: red;
         }
         
         button { padding: 15px; font-size: 16px; border: none; cursor: pointer; width: 100%; font-weight: bold; border-radius: 5px; margin-top: 10px; transition: 0.3s; }
         .btn-card { background-color: #007bff; color: white; }
-        .btn-smile { background-color: #00ff41; color: black; }
-        
-        /* Стили камеры */
-        #camera-container { display: none; margin-top: 20px; position: relative; }
-        video { width: 100%; border-radius: 10px; background: #000; transform: scaleX(-1); }
-        #timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 80px; color: white; font-weight: bold; text-shadow: 0 0 20px rgba(0,0,0,0.8); pointer-events: none; }
         
         #sberkot-image {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            width: 100px;
-            pointer-events: none;
+            position: absolute; bottom: 20px; right: 20px; width: 100px; pointer-events: none;
         }
     </style>
 </head>
@@ -72,17 +55,7 @@
             </div>
             <button class="btn-card" onclick="handlePaymentClick()">ОПЛАТИТЬ КАРТОЙ</button>
         </div>
-
-        <hr style="margin: 20px 0; border: 0.5px solid #eee;">
         
-        <button class="btn-smile" onclick="startTimerPayment()">ОПЛАТИТЬ УЛЫБКОЙ</button>
-
-        <div id="camera-container">
-            <video id="video" autoplay muted playsinline></video>
-            <div id="timer-overlay"></div>
-            <p id="camera-instruction">Идет подтверждение ...</p>
-        </div>
-
         <p id="status-text" style="margin-top: 15px; font-weight: bold;">Система готова</p>
     </div>
 
@@ -91,67 +64,57 @@
     <script>
         const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
+        // Функция задержки (больше не нужна, но оставил на всякий случай)
         function delay(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        function stopCamera(stream) {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-            document.getElementById('camera-container').style.display = "none";
-        }
-
-        async function startTimerPayment() {
-            const terminalId = document.getElementById('terminal-id').value;
-            if (!terminalId) return alert("Сначала введите ID терминала!");
-            const camContainer = document.getElementById('camera-container');
-            const video = document.getElementById('video');
-            const timerDiv = document.getElementById('timer-overlay');
-            const statusText = document.getElementById('status-text');
-            let stream = null;
-            statusText.innerText = "Инициализация камеры...";
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                video.srcObject = stream;
-                camContainer.style.display = "block";
-                await new Promise(resolve => video.onloadedmetadata = resolve);
-                for (let i = 5; i > 0; i--) {
-                    timerDiv.innerText = i;
-                    await delay(1000);
-                }
-                timerDiv.innerText = "";
-                stopCamera(stream);
-                const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
-                const data = await response.json();
-                const requiredAmount = parseFloat(data?.requiredAmount || document.getElementById('payment-input').value);
-                await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ state: "SUCCESS", paidAmount: requiredAmount, lastPaymentType: "timer" })
-                });
-                statusText.style.color = "green";
-                statusText.innerText = "✅ Оплата по улыбке успешно подтверждена!";
-            } catch (err) {
-                alert("Нет доступа к камере или ошибка сети: " + err.message);
-                if (stream) stopCamera(stream);
-            }
-        }
-
         async function handlePaymentClick() {
             const terminalId = document.getElementById('terminal-id').value;
-            const userEntered = parseFloat(document.getElementById('payment-input').value);
+            const userEnteredAmount = parseFloat(document.getElementById('payment-input').value);
             const statusText = document.getElementById('status-text');
-            if (!terminalId || isNaN(userEntered) || userEntered <= 0) {
+
+            if (!terminalId || isNaN(userEnteredAmount) || userEnteredAmount <= 0) {
                 statusText.style.color = "red";
                 statusText.innerText = "Ошибка: Введите корректные данные.";
                 return;
             }
-             await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ state: "SUCCESS", paidAmount: userEntered, lastPaymentType: "card" })
-                });
-            statusText.style.color = "green";
-            statusText.innerText = "✅ Оплата картой прошла успешно!";
+            
+            statusText.style.color = "orange";
+            statusText.innerText = "Проверка суммы...";
+
+            try {
+                // 1. Запрашиваем у Firebase, какую сумму ожидает терминал
+                const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
+                const data = await response.json();
+                
+                // Проверяем статус терминала и ожидаемую сумму
+                const expectedAmount = parseFloat(data?.amount);
+                
+                if (data.state === "WAITING_PAYMENT" && !isNaN(expectedAmount) && userEnteredAmount === expectedAmount) {
+                    // 2. Если суммы совпадают и терминал ждет оплаты - отправляем SUCCESS
+                     await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ state: "SUCCESS", paidAmount: userEnteredAmount, lastPaymentType: "card" })
+                    });
+                    statusText.style.color = "green";
+                    statusText.innerText = "✅ Оплата картой прошла успешно!";
+
+                } else if (userEnteredAmount !== expectedAmount) {
+                    // Если суммы не совпадают - отказ
+                    statusText.style.color = "red";
+                    statusText.innerText = `Ошибка: Сумма не совпадает с терминалом. Ожидается: ${expectedAmount} РУБ.`;
+
+                } else if (data.state !== "WAITING_PAYMENT") {
+                    // Если терминал не ждет оплаты
+                    statusText.style.color = "red";
+                    statusText.innerText = "Ошибка: Терминал сейчас не принимает оплату (статус IDLE/SUCCESS).";
+                }
+
+            } catch (error) {
+                statusText.style.color = "red";
+                statusText.innerText = "Ошибка связи с Firebase: " + error.message;
+            }
         }
     </script>       
 </body>
