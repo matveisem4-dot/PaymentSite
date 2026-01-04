@@ -7,20 +7,28 @@
         body { 
             font-family: sans-serif; 
             text-align: center; 
-            padding-top: 20px; 
-            background: linear-gradient(to bottom, #004d25, #008000, #4CAF50);
+            /* Удаляем стандартный padding-top */
+            /* background: linear-gradient(to bottom, #004d25, #008000, #4CAF50); */
+            /* Делаем фон всего экрана черным */
+            background-color: #000000; 
             color: white;
-            position: relative;
-            min-height: 100vh;
+            
+            /* Новые стили для центрирования контента на весь экран */
+            margin: 0;
+            display: flex;
+            justify-content: center; /* Выравнивание по горизонтали */
+            align-items: center;     /* Выравнивание по вертикали */
+            min-height: 100vh;       /* Занимаем всю высоту экрана */
         }
         .container { 
             max-width: 400px; 
-            margin: auto; 
+            /* margin: auto; */ /* margin: auto; больше не нужен благодаря flexbox */
             border: 1px solid rgba(255, 255, 255, 0.2); 
             padding: 30px; 
             border-radius: 15px; 
-            background: rgba(0, 0, 0, 0.4);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
+            /* Можно вернуть градиент внутрь контейнера, чтобы он был "полем" */
+            background: linear-gradient(to bottom, #004d25, #008000, #4CAF50);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5); /* Немного более темная тень для контраста на черном фоне */
         }
         .input-group { margin-bottom: 20px; text-align: left; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
@@ -42,6 +50,7 @@
     </style>
 </head>
 <body>
+    <!-- Ваш остальной HTML-код остается без изменений -->
     <div class="container">
         <h1>Оплата заказа 2025</h1>
         
@@ -63,6 +72,7 @@
 
     <img id="sberkot-image" src="free-png.ru" alt="СберКот" />
 
+    <!-- Ваш JavaScript остается без изменений -->
     <script>
         const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
