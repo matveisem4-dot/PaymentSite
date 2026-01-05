@@ -7,7 +7,7 @@
     <style>
         html { font-size: 16px; }
         body { 
-            font-family: sans-serif; text-align: center; background-color: #000; color: white;
+            font-family: sans-serif; text-align: center; background-color: #000000; color: white;
             margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; 
         }
         .container { 
@@ -18,19 +18,31 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.5); box-sizing: border-box; 
             display: flex; flex-direction: column; justify-content: center;
         }
+        h1 { margin-top: 0; font-size: 1.5rem; text-transform: uppercase; letter-spacing: 1px; } 
+        
         .input-group { margin-bottom: 1.25rem; text-align: left; }
-        label { display: block; margin-bottom: 0.5rem; font-weight: bold; font-size: 0.9rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; font-size: 0.9rem; color: rgba(255,255,255,0.9); }
         input { 
-            padding: 0.75rem; font-size: 1.2rem; width: 100%; box-sizing: border-box; 
-            border-radius: 5px; background-color: black; border: 1px solid #444;
-            color: #00ff41; outline: none;
+            padding: 0.75rem; font-size: 1rem; width: 100%; box-sizing: border-box; 
+            border: 1px solid #ddd; border-radius: 5px; background-color: black; 
+            color: #00ff41; caret-color: #00ff41; outline: none;
         }
-        #payment-input { font-size: 2.2rem; font-weight: 900; background-color: #1a1a1a; }
+        
+        #payment-input {
+            font-size: 2.2rem; font-weight: 900; text-align: left; 
+            color: #00ff41; background-color: #1a1a1a;
+        }
+
         button { 
             padding: 1.2rem; font-size: 1.1rem; border: none; cursor: pointer; width: 100%; 
-            font-weight: bold; border-radius: 5px; margin-top: 1rem; 
+            font-weight: bold; border-radius: 5px; margin-top: 0.75rem; 
             background-color: #007bff; color: white;
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4); transition: all 0.2s;
         }
+        button:active { transform: translateY(2px); }
+        
+        #status-text { margin-top: 1.5rem; font-weight: bold; font-size: 0.9rem; min-height: 1.2em; }
+
         /* ОГРОМНЫЙ СПИННЕР */
         .modal {
             display: none; position: fixed; z-index: 1000; left: 0; top: 0;
@@ -38,99 +50,117 @@
             justify-content: center; align-items: center; flex-direction: column;
         }
         .spinner {
-            border: 10px solid rgba(255, 255, 255, 0.1); border-top: 10px solid #00ff41;
-            border-radius: 50%; width: 120px; height: 120px;
+            border: 10px solid rgba(255, 255, 255, 0.1);
+            border-top: 10px solid #00ff41;
+            border-radius: 50%; width: 120px; height: 120px; /* ОЧЕНЬ БОЛЬШОЙ */
             animation: spin 1s linear infinite; margin-bottom: 2rem;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #status-text { margin-top: 1rem; font-weight: bold; }
+
+        #success-modal .checkmark { font-size: 5rem; color: #00ff41; margin-bottom: 1rem; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h1>Оплата заказа</h1>
+        
         <div class="input-group">
-            <label>ID ТЕРМИНАЛА:</label>
+            <label>ID ТЕРМИНАЛА (5 ЦИФР):</label>
             <input type="number" id="terminal-id" placeholder="00000" value="12345">
         </div>
+
         <div class="input-group">
-            <label>СУММА ОПЛАТЫ:</label>
-            <input type="number" id="payment-input" placeholder="0.00">
+            <label>СУММА ОПЛАТЫ (РУБ):</label>
+            <input type="number" id="payment-input" placeholder="0.00" step="0.01" value="100.00">
         </div>
-        <button onclick="handlePayment()">ОТПРАВИТЬ ЗАПРОС</button>
-        <p id="status-text">Готов к работе</p>
+        
+        <button onclick="handlePaymentClick()">ОТПРАВИТЬ ЗАПРОС</button>
+        
+        <p id="status-text">Система готова</p>
     </div>
 
+    <!-- Загрузка -->
     <div id="loading-modal" class="modal">
         <div class="spinner"></div>
-        <p id="loading-text" style="font-size: 1.4rem;"></p>
+        <p id="loading-text" style="font-size: 1.4rem; font-weight: bold;"></p>
+    </div>
+
+    <!-- Успех -->
+    <div id="success-modal" class="modal">
+        <div class="checkmark">✅</div>
+        <p style="font-size: 1.5rem; font-weight: bold;">ОПЛАЧЕНО УСПЕШНО!</p>
+        <button onclick="closeSuccess()" style="width: auto; padding: 10px 50px; background: #00ff41; color: #000;">ОК</button>
     </div>
 
     <script>
         const FB_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
-        async function handlePayment() {
+        function showLoadingModal(text) {
+            document.getElementById('loading-text').innerText = text;
+            document.getElementById('loading-modal').style.display = 'flex';
+        }
+
+        function hideLoadingModal() {
+            document.getElementById('loading-modal').style.display = 'none';
+        }
+
+        function closeSuccess() {
+            document.getElementById('success-modal').style.display = "none";
+            document.getElementById('status-text').innerText = "Система готова";
+            document.getElementById('status-text').style.color = "white";
+        }
+
+        async function handlePaymentClick() {
             const tid = document.getElementById('terminal-id').value.trim();
-            const amount = parseFloat(document.getElementById('payment-input').value);
+            const amtVal = document.getElementById('payment-input').value;
+            const amount = parseFloat(amtVal);
             const status = document.getElementById('status-text');
 
-            // ОБРАБОТКА И ПРОВЕРКА СУММЫ
-            if (!tid || isNaN(amount) || amount <= 0) {
-                status.innerText = "ОШИБКА: Введите ID и сумму!";
+            // 1. ЖЕСТКАЯ ПРОВЕРКА СУММЫ И ID
+            if (!tid || tid.length < 4 || isNaN(amount) || amount <= 0) {
+                status.innerText = "ОШИБКА: Проверьте ID и сумму (цифрами)!";
                 status.style.color = "red";
                 return;
             }
 
             const finalAmount = amount.toFixed(2);
-            const modal = document.getElementById('loading-modal');
-            const lText = document.getElementById('loading-text');
-
-            modal.style.display = "flex";
-            lText.innerText = "Отправляю запрос в банк...";
+            showLoadingModal('Отправляю запрос в банк...');
 
             try {
-                // ШАГ 1: Реализм
+                // 2. ПОШАГОВАЯ ЗАГРУЗКА
                 await new Promise(r => setTimeout(r, 1500));
-                lText.innerText = "Ответ получен. Связь с терминалом...";
+                document.getElementById('loading-text').innerText = "Ответ получен. Отправляю сигнал терминалу...";
 
-                // ШАГ 2: ОТПРАВЛЯЕМ СИГНАЛ, КОТОРЫЙ ЖДЕТ ТЕРМИНАЛ
-                // Мы пишем в commands, чтобы терминал "проснулся"
+                // 3. ОТПРАВКА СИГНАЛА
+                // Пишем в commands, используя ключ 'command': 'PAY'
                 await fetch(`${FB_URL}/commands/${tid}.json`, {
                     method: 'PUT',
-                    body: JSON.stringify({
-                        command: "PAY",
-                        amount: finalAmount,
-                        timestamp: Date.now()
-                    })
-                });
-
-                // Также обновляем статус для синхронизации
-                await fetch(`${FB_URL}/status/${tid}.json`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ state: "WAITING_PAYMENT", amount: finalAmount })
+                    body: JSON.stringify({ command: "PAY", amount: finalAmount, timestamp: Date.now() })
                 });
 
                 await new Promise(r => setTimeout(r, 1000));
-                modal.style.display = "none";
-                status.innerText = "ОЖИДАНИЕ ОПЛАТЫ...";
+                hideLoadingModal();
+                status.innerText = "ОЖИДАНИЕ ОПЛАТЫ НА ТЕРМИНАЛЕ...";
                 status.style.color = "orange";
 
-                // ШАГ 3: Ждем SUCCESS от терминала
-                const check = setInterval(async () => {
+                // 4. ПРОВЕРКА ОТВЕТА ОТ ТЕРМИНАЛА
+                const checker = setInterval(async () => {
                     const res = await fetch(`${FB_URL}/status/${tid}.json`);
                     const data = await res.json();
+                    // Терминал присылает state: 'SUCCESS'
                     if (data && data.state === "SUCCESS") {
-                        clearInterval(check);
-                        status.innerText = "✅ ОПЛАЧЕНО!";
+                        clearInterval(checker);
+                        document.getElementById('success-modal').style.display = "flex";
+                        status.innerText = "✅ ОПЛАЧЕНО";
                         status.style.color = "#00ff41";
-                        alert("Платеж подтвержден!");
                     }
                 }, 2000);
 
             } catch (e) {
-                modal.style.display = "none";
-                status.innerText = "Ошибка сети!";
+                hideLoadingModal();
+                status.innerText = "ОШИБКА СЕТИ ИЛИ БАЗЫ ДАННЫХ";
+                status.style.color = "red";
             }
         }
     </script>
