@@ -2,71 +2,120 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Касса Оплаты 2026</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Оплата заказа 2026 (Касса)</title>
     <style>
-        body { background: #121212; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .box { width: 350px; padding: 30px; border-radius: 20px; background: #1a1a1a; border: 1px solid #333; text-align: center; }
-        input { width: 100%; padding: 15px; margin: 15px 0; box-sizing: border-box; background: #000; border: 1px solid #444; color: #7cec84; font-size: 20px; border-radius: 10px; }
-        button { width: 100%; padding: 18px; background: #7cec84; color: #004d25; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; }
-        #loading-overlay { display:none; margin-top: 20px; color: #7cec84; font-weight: bold; }
+        html { font-size: 16px; }
+        body { 
+            font-family: sans-serif; text-align: center; background-color: #000000; color: white;
+            margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; 
+        }
+        .container { 
+            width: 380px; 
+            max-width: 90%; 
+            border: 1px solid rgba(255, 255, 255, 0.2); 
+            padding: 1.5rem; 
+            border-radius: 15px; 
+            background: linear-gradient(to bottom, #004d25, #008000, #4CAF50);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5); 
+            box-sizing: border-box; 
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        h1 { margin-top: 0; font-size: 1.5rem; } 
+        .input-group { margin-bottom: 1.25rem; text-align: left; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; font-size: 0.9rem; }
+        input { 
+            padding: 0.75rem; font-size: 1rem; width: 100%; box-sizing: border-box; 
+            border: 1px solid #ddd; border-radius: 5px; background-color: black; 
+            color: #00ff41; caret-color: #00ff41;
+        }
+        
+        #payment-input {
+            font-size: 2rem; font-weight: 900; background-color: #1a1a1a;
+        }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        
+        button { 
+            padding: 1rem; font-size: 1rem; border: none; cursor: pointer; width: 100%; 
+            font-weight: bold; border-radius: 5px; margin-top: 0.75rem; 
+            background-color: #007bff; color: white;
+        }
+        
+        #status-text { margin-top: 1rem; font-weight: bold; font-size: 0.9rem; }
+
     </style>
 </head>
 <body>
-    <div class="box">
-        <h2 style="color: #7cec84; margin-top: 0;">КАССА 2026</h2>
-        <label>ID ТЕРМИНАЛА:</label>
-        <input type="number" id="tid" placeholder="00000">
-        <label>СУММА (РУБ):</label>
-        <input type="number" id="sum" value="100.00">
-        <button onclick="sendPay()">ОТПРАВИТЬ СЧЕТ</button>
-        <div id="loading-overlay">Отправка...</div>
-        <p id="status" style="margin-top: 20px; color: #888;">Готов к работе</p>
+    <div class="container">
+        <h1>Сайт оплаты (Оператор)</h1>
+        
+        <div class="input-group">
+            <label for="terminal-id">ID ТЕРМИНАЛА:</label>
+            <input type="number" id="terminal-id" placeholder="12345" value="12345">
+        </div>
+
+        <div class="input-group">
+            <label for="payment-input">СУММА ОПЛАТЫ (РУБ):</label>
+            <input type="number" id="payment-input" placeholder="0.00" step="0.01" value="100.00">
+        </div>
+        
+        <button onclick="handlePaymentClick()">ОТПРАВИТЬ ЗАПРОС НА ТЕРМИНАЛ</button>
+        
+        <p id="status-text" style="margin-top: 15px; font-weight: bold;">Система готова</p>
     </div>
 
     <script>
-        const DB = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
+        const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
+        let statusCheckInterval = null;
 
-        async function sendPay() {
-            const tid = document.getElementById('tid').value;
-            const sum = document.getElementById('sum').value;
-            const loader = document.getElementById('loading-overlay');
-            const status = document.getElementById('status');
+        async function handlePaymentClick() {
+            const tid = document.getElementById('terminal-id').value;
+            const rawAmount = document.getElementById('payment-input').value;
+            const amount = parseFloat(rawAmount);
+            const statusText = document.getElementById('status-text');
 
-            if(!tid || !sum) return alert("Введите данные!");
+            if (!tid || isNaN(amount) || amount <= 0) {
+                statusText.style.color = "red";
+                statusText.innerText = "Ошибка: проверьте ID и сумму!";
+                return;
+            }
 
-            loader.style.display = "block";
-            status.innerText = "Связь с банком...";
+            const finalAmount = amount.toFixed(2);
+            statusText.style.color = "orange";
+            statusText.innerText = "Отправка сигнала на терминал...";
 
             try {
-                // ШАГ 1: Показываем процесс
-                await new Promise(r => setTimeout(r, 1000));
-                loader.innerText = "Ответ получен. Отправка на терминал...";
-
-                // ШАГ 2: Чистим старый статус и шлем команду
-                await fetch(`${DB}/status/${tid}.json`, {method:'PUT', body: JSON.stringify({state:'WAITING'})});
-                await fetch(`${DB}/commands/${tid}.json`, {
+                // Отправляем команду PAY терминалу (ключ "type": "PAY")
+                await fetch(`${FIREBASE_BASE_URL}/commands/${tid}.json`, {
                     method: 'PUT',
-                    body: JSON.stringify({ type: "PAY", amount: sum })
+                    body: JSON.stringify({ type: "PAY", amount: finalAmount })
                 });
 
-                status.innerText = "ОЖИДАНИЕ ОПЛАТЫ НА ТЕРМИНАЛЕ...";
-                loader.style.display = "none";
+                // Устанавливаем статус WAITING, чтобы терминал ждал
+                await fetch(`${FIREBASE_BASE_URL}/status/${tid}.json`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ state: "WAITING", amount: finalAmount })
+                });
+                
+                statusText.innerText = `Запрос на ${finalAmount} РУБ отправлен. Ожидайте оплаты...`;
 
-                // ШАГ 3: Ждем SUCCESS от терминала
-                const check = setInterval(async () => {
-                    const r = await fetch(`${DB}/status/${tid}.json`);
-                    const d = await r.json();
-                    if(d && d.state === "SUCCESS") {
-                        clearInterval(check);
-                        status.innerText = "✅ ОПЛАЧЕНО!";
-                        status.style.color = "#7cec84";
-                        alert("Платеж подтвержден!");
+                // Начинаем ждать подтверждения от терминала
+                if (statusCheckInterval) clearInterval(statusCheckInterval);
+                statusCheckInterval = setInterval(async () => {
+                    const res = await fetch(`${FIREBASE_BASE_URL}/status/${tid}.json`);
+                    const data = await res.json();
+                    
+                    if (data && data.state === "SUCCESS") {
+                        clearInterval(statusCheckInterval);
+                        statusText.style.color = "#00ff41";
+                        statusText.innerText = "✅ ОПЛАЧЕНО УСПЕШНО! Можете отправить новый счет.";
                     }
                 }, 2000);
 
-            } catch(e) { 
-                alert("Ошибка сети!"); 
-                loader.style.display = "none";
+            } catch (error) {
+                statusText.style.color = "red";
+                statusText.innerText = "Ошибка связи с базой данных!";
             }
         }
     </script>
