@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Оплата заказа 2026 (Касса)</title>
+    <title>Оплата заказа 2026</title>
     <style>
         html { font-size: 16px; }
         body { 
@@ -11,15 +11,11 @@
             margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; 
         }
         .container { 
-            width: 380px; 
-            max-width: 90%; 
-            border: 1px solid rgba(255, 255, 255, 0.2); 
-            padding: 1.5rem; 
-            border-radius: 15px; 
+            width: 380px; max-width: 90%; 
+            padding: 1.5rem; border-radius: 15px; 
             background: linear-gradient(to bottom, #004d25, #008000, #4CAF50);
             box-shadow: 0 4px 6px rgba(0,0,0,0.5); 
             box-sizing: border-box; 
-            display: flex; flex-direction: column; justify-content: center;
         }
         h1 { margin-top: 0; font-size: 1.5rem; } 
         .input-group { margin-bottom: 1.25rem; text-align: left; }
@@ -29,26 +25,33 @@
             border: 1px solid #ddd; border-radius: 5px; background-color: black; 
             color: #00ff41; caret-color: #00ff41;
         }
-        
-        #payment-input {
-            font-size: 2rem; font-weight: 900; background-color: #1a1a1a;
-        }
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type=number] { -moz-appearance: textfield; }
-        
+        #payment-input { font-size: 2rem; font-weight: 900; background-color: #1a1a1a; }
         button { 
             padding: 1rem; font-size: 1rem; border: none; cursor: pointer; width: 100%; 
             font-weight: bold; border-radius: 5px; margin-top: 0.75rem; 
             background-color: #007bff; color: white;
         }
-        
         #status-text { margin-top: 1rem; font-weight: bold; font-size: 0.9rem; }
 
+        /* Модальные окна и большой спиннер */
+        .modal {
+            display: none; position: fixed; z-index: 100; left: 0; top: 0;
+            width: 100%; height: 100%; background-color: rgba(0,0,0,0.9);
+            justify-content: center; align-items: center; flex-direction: column;
+            color: white; font-size: 1.2rem;
+        }
+        .spinner {
+            border: 8px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
+            border-top: 8px solid #00ff41; width: 80px; height: 80px; /* Сделал намного больше */
+            animation: spin 1s linear infinite; margin-bottom: 1rem;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #success-modal .checkmark { font-size: 4rem; color: #00ff41; margin-bottom: 1rem; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Сайт оплаты (Оператор)</h1>
+        <h1>Оплата заказа</h1>
         
         <div class="input-group">
             <label for="terminal-id">ID ТЕРМИНАЛА:</label>
@@ -57,50 +60,92 @@
 
         <div class="input-group">
             <label for="payment-input">СУММА ОПЛАТЫ (РУБ):</label>
-            <input type="number" id="payment-input" placeholder="0.00" step="0.01" value="100.00">
+            <input type="number" id="payment-input" step="0.01" value="100.00">
         </div>
         
-        <button onclick="handlePaymentClick()">ОТПРАВИТЬ ЗАПРОС НА ТЕРМИНАЛ</button>
+        <button onclick="handlePaymentClick()">ОТПРАВИТЬ ЗАПРОС</button>
         
         <p id="status-text" style="margin-top: 15px; font-weight: bold;">Система готова</p>
+    </div>
+
+    <!-- Модальное окно загрузки -->
+    <div id="loading-modal" class="modal">
+        <div class="spinner"></div>
+        <p id="loading-text">Отправка запроса...</p>
+    </div>
+
+    <!-- Модальное окно успеха -->
+    <div id="success-modal" class="modal">
+        <div class="checkmark">✅</div>
+        <p>ОПЛАЧЕНО УСПЕШНО!</p>
+        <button onclick="hideSuccessModal()" style="width: auto; padding: 10px 40px;">ГОТОВО</button>
     </div>
 
     <script>
         const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
         let statusCheckInterval = null;
 
+        function showLoadingModal(text) {
+            document.getElementById('loading-text').innerText = text;
+            document.getElementById('loading-modal').style.display = 'flex';
+        }
+
+        function hideLoadingModal() {
+            document.getElementById('loading-modal').style.display = 'none';
+        }
+        
+        function showSuccessModal() {
+            document.getElementById('success-modal').style.display = 'flex';
+        }
+        
+        function hideSuccessModal() {
+            document.getElementById('success-modal').style.display = 'none';
+            document.getElementById('status-text').innerText = "Система готова";
+            document.getElementById('status-text').style.color = "white";
+        }
+
         async function handlePaymentClick() {
-            const tid = document.getElementById('terminal-id').value;
-            const rawAmount = document.getElementById('payment-input').value;
+            const tid = document.getElementById('terminal-id').value.trim();
+            const rawAmount = document.getElementById('payment-input').value.replace(',', '.');
             const amount = parseFloat(rawAmount);
             const statusText = document.getElementById('status-text');
 
-            if (!tid || isNaN(amount) || amount <= 0) {
+            // 1. Проверка суммы и ID
+            if (!tid || tid.length !== 5 || isNaN(amount) || amount <= 0) {
                 statusText.style.color = "red";
-                statusText.innerText = "Ошибка: проверьте ID и сумму!";
-                return;
+                statusText.innerText = "Ошибка: проверьте ID терминала (5 цифр) и сумму!";
+                return; // Останавливаем выполнение, если неверно
             }
 
             const finalAmount = amount.toFixed(2);
             statusText.style.color = "orange";
-            statusText.innerText = "Отправка сигнала на терминал...";
+            statusText.innerText = "Отправляю запрос в банк...";
+            showLoadingModal('Отправляю запрос в банк...'); // Показываем загрузку
 
             try {
-                // Отправляем команду PAY терминалу (ключ "type": "PAY")
+                // Имитация ожидания ответа от банка
+                await new Promise(r => setTimeout(r, 2000)); 
+                document.getElementById('loading-text').innerText = 'Ответ получен. Синхронизация с терминалом...';
+
+                // 2. Отправляем сигнал на терминал ТОЛЬКО после успешной "проверки"
                 await fetch(`${FIREBASE_BASE_URL}/commands/${tid}.json`, {
                     method: 'PUT',
                     body: JSON.stringify({ type: "PAY", amount: finalAmount })
                 });
 
-                // Устанавливаем статус WAITING, чтобы терминал ждал
+                // Устанавливаем статус WAITING для мониторинга
                 await fetch(`${FIREBASE_BASE_URL}/status/${tid}.json`, {
                     method: 'PUT',
                     body: JSON.stringify({ state: "WAITING", amount: finalAmount })
                 });
                 
-                statusText.innerText = `Запрос на ${finalAmount} РУБ отправлен. Ожидайте оплаты...`;
+                await new Promise(r => setTimeout(r, 1000)); // Короткая пауза
+                
+                hideLoadingModal(); // Скрываем загрузку
+                statusText.style.color = "orange";
+                statusText.innerText = `Запрос на ${finalAmount} РУБ отправлен. Ожидайте оплаты на терминале...`;
 
-                // Начинаем ждать подтверждения от терминала
+                // 3. Ждем подтверждения оплаты
                 if (statusCheckInterval) clearInterval(statusCheckInterval);
                 statusCheckInterval = setInterval(async () => {
                     const res = await fetch(`${FIREBASE_BASE_URL}/status/${tid}.json`);
@@ -108,12 +153,14 @@
                     
                     if (data && data.state === "SUCCESS") {
                         clearInterval(statusCheckInterval);
+                        showSuccessModal();
                         statusText.style.color = "#00ff41";
-                        statusText.innerText = "✅ ОПЛАЧЕНО УСПЕШНО! Можете отправить новый счет.";
+                        statusText.innerText = "✅ ОПЛАЧЕНО УСПЕШНО!";
                     }
                 }, 2000);
 
             } catch (error) {
+                hideLoadingModal();
                 statusText.style.color = "red";
                 statusText.innerText = "Ошибка связи с базой данных!";
             }
