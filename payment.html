@@ -2,78 +2,74 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Завершение оплаты</title>
+    <title>Процессинг Оплаты</title>
     <style>
-        body { background: #000; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .container { 
-            width: 380px; padding: 1.5rem; border-radius: 15px; 
-            background: linear-gradient(to bottom, #004d25, #008000, #4CAF50); 
-            border: 1px solid rgba(255,255,255,0.2); 
-        }
-        h1 { margin-top: 0; font-size: 1.5rem; }
-        .input-group { margin-bottom: 1.25rem; text-align: left; }
-        label { display: block; margin-bottom: 0.5rem; font-weight: bold; color: rgba(255,255,255,0.9); }
-        input { 
-            padding: 0.75rem; width: 100%; box-sizing: border-box; border-radius: 5px; 
-            background: #000; color: #00ff41; border: 1px solid #444; font-size: 1.2rem;
-        }
-        #payment-input { font-size: 2rem; font-weight: 900; }
-        button { padding: 1rem; font-size: 1.1rem; border: none; cursor: pointer; width: 100%; font-weight: bold; border-radius: 5px; margin-top: 1rem; background: #FF5733; color: white; }
-        #status-text { margin-top: 1rem; font-weight: bold; min-height: 1.2em; }
+        body { background: #121212; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { width: 350px; padding: 20px; border-radius: 15px; background: #1e1e1e; border: 1px solid #333; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; box-sizing: border-box; border-radius: 5px; border: 1px solid #444; background: #000; color: #00ff41; font-size: 1.1rem; }
+        button { width: 100%; padding: 15px; border: none; border-radius: 5px; background: #28a745; color: white; font-weight: bold; cursor: pointer; }
+        #status { margin-top: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Сайт оплаты (Мгновенно)</h1>
-        <div class="input-group">
-            <label>ID ТЕРМИНАЛА:</label>
-            <input type="number" id="tid" placeholder="00000" value="12345">
-        </div>
-        <div class="input-group">
-            <label>СУММА К ОПЛАТЕ:</label>
-            <input type="number" id="sum" placeholder="0.00" value="100.00">
-        </div>
-        <button onclick="completePayment()">МГНОВЕННО ОПЛАТИТЬ</button>
-        <p id="status-text">Готов к работе</p>
+        <h2>Оплата 2026</h2>
+        <input type="number" id="tid" placeholder="Введите ID терминала">
+        <input type="number" id="user-sum" placeholder="Введите сумму">
+        <button onclick="checkAndPay()">ОПЛАТИТЬ</button>
+        <p id="status">Введите данные</p>
     </div>
-    
+
     <script>
-        const DB = "https://cassa-simulator-4-default-rtdb.firebaseio.com/";
+        const DB = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
-        async function completePayment() {
-            const tid = document.getElementById('tid').value.trim();
-            const sumInput = document.getElementById('sum').value.replace(',', '.');
-            const sum = parseFloat(sumInput);
-            const status = document.getElementById('status-text');
+        async function checkAndPay() {
+            const tid = document.getElementById('tid').value;
+            const userSum = parseFloat(document.getElementById('user-sum').value);
+            const status = document.getElementById('status');
 
-            // ПРОВЕРКА СУММЫ И ID
-            if (!tid || tid.length < 4 || isNaN(sum) || sum <= 0) {
-                status.innerText = "ОШИБКА: Проверьте ID и сумму (цифрами)!";
-                status.style.color = "red";
+            if (!tid || isNaN(userSum)) {
+                status.innerText = "⚠️ Заполните все поля";
                 return;
             }
-            
-            const finalAmount = sum.toFixed(2);
-            status.innerText = "Отправляю сигнал 'Оплачено'...";
-            status.style.color = "orange";
+
+            status.innerText = "Проверка данных...";
+            status.style.color = "white";
 
             try {
-                // ОТПРАВЛЯЕМ СТАТУС SUCCESS В БАЗУ ДАННЫХ
-                await fetch(`${DB}/status/${tid}.json`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ 
-                        state: "SUCCESS", 
-                        amount: finalAmount, // Добавляем сумму в подтверждение
-                        timestamp: Date.now() 
-                    })
-                });
+                // 1. Получаем данные терминала из базы
+                const r = await fetch(`${DB}/${tid}.json`);
+                const data = await r.json();
 
-                status.innerText = "✅ СИГНАЛ УСПЕХА ОТПРАВЛЕН!";
-                status.style.color = "#00ff41";
+                if (!data) {
+                    status.innerText = "❌ Терминал не найден";
+                    status.style.color = "red";
+                    return;
+                }
+
+                const targetAmount = parseFloat(data.amount);
+
+                // 2. ЖЁСТКАЯ ПРОВЕРКА СУММЫ
+                if (userSum < targetAmount) {
+                    status.innerText = "❌ НЕДОСТАТОЧНО СРЕДСТВ";
+                    status.style.color = "#ff4444";
+                } 
+                else if (userSum > targetAmount) {
+                    status.innerText = "❌ СЛИШКОМ МНОГО ДЕНЕГ";
+                    status.style.color = "#ffbb33";
+                } 
+                else {
+                    // 3. СУММА СОВПАЛА — ОТПРАВЛЯЕМ СИГНАЛ УСПЕХА
+                    await fetch(`${DB}/${tid}.json`, {
+                        method: 'PATCH', // Используем PATCH, чтобы обновить только статус
+                        body: JSON.stringify({ status: "SUCCESS" })
+                    });
+                    status.innerText = "✅ ОПЛАЧЕНО УСПЕШНО!";
+                    status.style.color = "#00ff41";
+                }
 
             } catch (e) {
-                status.innerText = "Ошибка сети!";
-                status.style.color = "red";
+                status.innerText = "Ошибка связи с базой";
             }
         }
     </script>
