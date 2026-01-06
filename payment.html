@@ -2,74 +2,131 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Процессинг Оплаты</title>
+    <title>Банковский Процессинг 2026</title>
     <style>
-        body { background: #121212; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .container { width: 350px; padding: 20px; border-radius: 15px; background: #1e1e1e; border: 1px solid #333; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; box-sizing: border-box; border-radius: 5px; border: 1px solid #444; background: #000; color: #00ff41; font-size: 1.1rem; }
-        button { width: 100%; padding: 15px; border: none; border-radius: 5px; background: #28a745; color: white; font-weight: bold; cursor: pointer; }
-        #status { margin-top: 15px; font-weight: bold; }
+        body { background: #121212; color: white; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { width: 360px; background: #1e1e1e; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; position: relative; overflow: hidden; }
+        
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #000; color: #00ff41; font-size: 1rem; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; border: none; border-radius: 8px; background: #28a745; color: white; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.3s; }
+        button:disabled { background: #444; }
+
+        /* Экран загрузки/симуляции */
+        #processing-overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #1e1e1e; z-index: 10; flex-direction: column; justify-content: center; align-items: center;
+        }
+
+        /* Анимация банковской карты */
+        .card-anim {
+            width: 100px; height: 60px; background: linear-gradient(45deg, #333, #666);
+            border-radius: 5px; margin-bottom: 20px; position: relative;
+            animation: insertCard 2s infinite ease-in-out;
+        }
+        @keyframes insertCard {
+            0% { transform: translateY(50px); opacity: 0; }
+            50% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-20px); opacity: 0; }
+        }
+
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid #00ff41; border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 15px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #status-msg { font-size: 14px; letter-spacing: 1px; color: #aaa; }
     </style>
 </head>
 <body>
+
     <div class="container">
-        <h2>Оплата 2026</h2>
-        <input type="number" id="tid" placeholder="Введите ID терминала">
-        <input type="number" id="user-sum" placeholder="Введите сумму">
-        <button onclick="checkAndPay()">ОПЛАТИТЬ</button>
-        <p id="status">Введите данные</p>
+        <div id="main-ui">
+            <h2 style="margin-top:0">Оплата картой</h2>
+            <p style="font-size: 12px; color: #888;">Введите данные терминала</p>
+            
+            <input type="number" id="tid" placeholder="ID ТЕРМИНАЛА">
+            <input type="number" id="user-sum" placeholder="СУММА (0.00)">
+            
+            <button onclick="startPayment()">ПОДТВЕРДИТЬ ОПЛАТУ</button>
+            <p id="error-log" style="color: #ff4444; font-size: 13px;"></p>
+        </div>
+
+        <!-- Слой симуляции -->
+        <div id="processing-overlay">
+            <div id="anim-box">
+                <div class="card-anim"></div>
+                <div class="spinner"></div>
+            </div>
+            <div id="status-msg">СВЯЗЬ С БАНКОМ...</div>
+        </div>
     </div>
 
     <script>
         const DB = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
-        async function checkAndPay() {
+        async function startPayment() {
             const tid = document.getElementById('tid').value;
             const userSum = parseFloat(document.getElementById('user-sum').value);
-            const status = document.getElementById('status');
+            const errorLog = document.getElementById('error-log');
+            const overlay = document.getElementById('processing-overlay');
+            const statusMsg = document.getElementById('status-msg');
 
             if (!tid || isNaN(userSum)) {
-                status.innerText = "⚠️ Заполните все поля";
+                errorLog.innerText = "⚠️ Укажите ID и сумму";
                 return;
             }
 
-            status.innerText = "Проверка данных...";
-            status.style.color = "white";
-
+            errorLog.innerText = "";
+            
             try {
-                // 1. Получаем данные терминала из базы
+                // 1. Проверяем терминал в базе
                 const r = await fetch(`${DB}/${tid}.json`);
                 const data = await r.json();
 
                 if (!data) {
-                    status.innerText = "❌ Терминал не найден";
-                    status.style.color = "red";
+                    errorLog.innerText = "❌ Терминал не найден";
                     return;
                 }
 
                 const targetAmount = parseFloat(data.amount);
 
-                // 2. ЖЁСТКАЯ ПРОВЕРКА СУММЫ
+                // 2. Жёсткая проверка суммы
                 if (userSum < targetAmount) {
-                    status.innerText = "❌ НЕДОСТАТОЧНО СРЕДСТВ";
-                    status.style.color = "#ff4444";
+                    errorLog.innerText = "❌ НЕДОСТАТОЧНО СРЕДСТВ";
+                    return;
                 } 
-                else if (userSum > targetAmount) {
-                    status.innerText = "❌ СЛИШКОМ МНОГО ДЕНЕГ";
-                    status.style.color = "#ffbb33";
-                } 
-                else {
-                    // 3. СУММА СОВПАЛА — ОТПРАВЛЯЕМ СИГНАЛ УСПЕХА
-                    await fetch(`${DB}/${tid}.json`, {
-                        method: 'PATCH', // Используем PATCH, чтобы обновить только статус
-                        body: JSON.stringify({ status: "SUCCESS" })
-                    });
-                    status.innerText = "✅ ОПЛАЧЕНО УСПЕШНО!";
-                    status.style.color = "#00ff41";
+                if (userSum > targetAmount) {
+                    errorLog.innerText = "❌ СЛИШКОМ МНОГО ДЕНЕГ";
+                    return;
                 }
 
+                // 3. Если сумма совпала — запускаем СИМУЛЯЦИЮ
+                overlay.style.display = 'flex';
+                
+                // Шаг 1: Авторизация
+                setTimeout(() => { statusMsg.innerText = "ПРОВЕРКА ПИН-КОДА..."; }, 1500);
+                
+                // Шаг 2: Транзакция
+                setTimeout(() => { statusMsg.innerText = "ОДОБРЕНИЕ ТРАНЗАКЦИИ..."; }, 3000);
+
+                // Шаг 3: Финал
+                setTimeout(async () => {
+                    statusMsg.innerText = "✅ УСПЕШНО";
+                    statusMsg.style.color = "#00ff41";
+                    
+                    // Отправляем сигнал на терминал
+                    await fetch(`${DB}/${tid}.json`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ status: "SUCCESS" })
+                    });
+
+                    setTimeout(() => { location.reload(); }, 2000);
+                }, 4500);
+
             } catch (e) {
-                status.innerText = "Ошибка связи с базой";
+                errorLog.innerText = "Ошибка соединения";
             }
         }
     </script>
