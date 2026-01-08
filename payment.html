@@ -6,18 +6,16 @@
     <style>
         body { background: #121212; color: white; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .container { width: 360px; background: #1e1e1e; border-radius: 20px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; position: relative; overflow: hidden; }
-        
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #000; color: #00ff41; font-size: 1rem; box-sizing: border-box; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #000; color: #00ff41; font-size: 1rem; box-sizing: border-box; outline: none; }
+        input:focus { border-color: #28a745; }
         button { width: 100%; padding: 15px; border: none; border-radius: 8px; background: #28a745; color: white; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.3s; }
-        button:disabled { background: #444; }
-
-        /* Экран загрузки/симуляции */
+        button:active { transform: scale(0.98); }
+        
         #processing-overlay {
             display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #1e1e1e; z-index: 10; flex-direction: column; justify-content: center; align-items: center;
         }
 
-        /* Анимация банковской карты */
         .card-anim {
             width: 100px; height: 60px; background: linear-gradient(45deg, #333, #666);
             border-radius: 5px; margin-bottom: 20px; position: relative;
@@ -35,98 +33,102 @@
             animation: spin 1s linear infinite; margin-bottom: 15px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        #status-msg { font-size: 14px; letter-spacing: 1px; color: #aaa; }
+        #status-msg { font-size: 14px; letter-spacing: 1px; color: #aaa; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <div id="main-ui">
-            <h2 style="margin-top:0">Оплата картой</h2>
-            <p style="font-size: 12px; color: #888;">Введите данные терминала</p>
+            <h2 style="margin-top:0">Эмуляция Карты</h2>
+            <p style="font-size: 12px; color: #888;">Введите данные с экрана терминала</p>
             
-            <input type="number" id="tid" placeholder="ID ТЕРМИНАЛА">
-            <input type="number" id="user-sum" placeholder="СУММА (0.00)">
+            <input type="number" id="tid" placeholder="ID ТЕРМИНАЛА (6 цифр)">
+            <input type="number" id="user-sum" placeholder="СУММА ОПЛАТЫ">
             
-            <button onclick="startPayment()">ПОДТВЕРДИТЬ ОПЛАТУ</button>
-            <p id="error-log" style="color: #ff4444; font-size: 13px;"></p>
+            <button id="pay-btn" onclick="startPayment()">ПОДТВЕРДИТЬ ОПЛАТУ</button>
+            <p id="error-log" style="color: #ff4444; font-size: 13px; min-height: 1.2em;"></p>
         </div>
 
-        <!-- Слой симуляции -->
         <div id="processing-overlay">
-            <div id="anim-box">
-                <div class="card-anim"></div>
-                <div class="spinner"></div>
-            </div>
+            <div class="card-anim"></div>
+            <div class="spinner"></div>
             <div id="status-msg">СВЯЗЬ С БАНКОМ...</div>
         </div>
     </div>
 
     <script>
-        const DB = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
+        const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
         async function startPayment() {
             const tid = document.getElementById('tid').value;
-            const userSum = parseFloat(document.getElementById('user-sum').value);
+            const userSum = document.getElementById('user-sum').value;
             const errorLog = document.getElementById('error-log');
             const overlay = document.getElementById('processing-overlay');
             const statusMsg = document.getElementById('status-msg');
 
-            if (!tid || isNaN(userSum)) {
-                errorLog.innerText = "⚠️ Укажите ID и сумму";
+            if (!tid || !userSum) {
+                errorLog.innerText = "⚠️ Введите ID и сумму";
                 return;
             }
 
-            errorLog.innerText = "";
+            errorLog.innerText = "Проверка терминала...";
             
             try {
-                // 1. Проверяем терминал в базе
-                const r = await fetch(`${DB}/${tid}.json`);
-                const data = await r.json();
+                // 1. Сначала ПРОВЕРЯЕМ, существует ли такой терминал и ждет ли он оплаты
+                // Путь СТРОГО такой же как в терминале: status/ID
+                const response = await fetch(`${FIREBASE_BASE_URL}/status/${tid}.json`);
+                const terminalData = await response.json();
 
-                if (!data) {
+                if (!terminalData) {
                     errorLog.innerText = "❌ Терминал не найден";
                     return;
                 }
 
-                const targetAmount = parseFloat(data.amount);
-
-                // 2. Жёсткая проверка суммы
-                if (userSum < targetAmount) {
-                    errorLog.innerText = "❌ НЕДОСТАТОЧНО СРЕДСТВ";
-                    return;
-                } 
-                if (userSum > targetAmount) {
-                    errorLog.innerText = "❌ СЛИШКОМ МНОГО ДЕНЕГ";
+                if (terminalData.state !== "WAITING_PAYMENT") {
+                    errorLog.innerText = "❌ Терминал не в режиме оплаты";
                     return;
                 }
 
-                // 3. Если сумма совпала — запускаем СИМУЛЯЦИЮ
+                // Проверка суммы (необязательно, но для реализма полезно)
+                if (parseFloat(userSum) !== parseFloat(terminalData.amount)) {
+                    errorLog.innerText = `❌ Ошибка суммы. Нужно: ${terminalData.amount}`;
+                    return;
+                }
+
+                // 2. Если всё ок, запускаем визуальную симуляцию
+                errorLog.innerText = "";
                 overlay.style.display = 'flex';
-                
-                // Шаг 1: Авторизация
-                setTimeout(() => { statusMsg.innerText = "ПРОВЕРКА ПИН-КОДА..."; }, 1500);
-                
-                // Шаг 2: Транзакция
-                setTimeout(() => { statusMsg.innerText = "ОДОБРЕНИЕ ТРАНЗАКЦИИ..."; }, 3000);
 
-                // Шаг 3: Финал
+                setTimeout(() => { statusMsg.innerText = "АВТОРИЗАЦИЯ КАРТЫ..."; }, 1500);
+                setTimeout(() => { statusMsg.innerText = "ОДОБРЕНИЕ БАНКА..."; }, 3000);
+
+                // 3. ФИНАЛЬНЫЙ ШАГ: Отправляем сигнал SUCCESS в ту же ячейку, которую слушает терминал
                 setTimeout(async () => {
-                    statusMsg.innerText = "✅ УСПЕШНО";
-                    statusMsg.style.color = "#00ff41";
-                    
-                    // Отправляем сигнал на терминал
-                    await fetch(`${DB}/${tid}.json`, {
-                        method: 'PATCH',
-                        body: JSON.stringify({ status: "SUCCESS" })
-                    });
+                    try {
+                        await fetch(`${FIREBASE_BASE_URL}/status/${tid}.json`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ 
+                                state: "SUCCESS", // Именно state, а не status
+                                lastUpdate: Date.now() 
+                            })
+                        });
 
-                    setTimeout(() => { location.reload(); }, 2000);
+                        statusMsg.innerText = "✅ ОПЛАЧЕНО УСПЕШНО";
+                        statusMsg.style.color = "#00ff41";
+                        
+                        // Перезагрузка через 3 секунды
+                        setTimeout(() => { location.reload(); }, 3000);
+
+                    } catch (err) {
+                        statusMsg.innerText = "ОШИБКА ЗАПИСИ";
+                        console.error(err);
+                    }
                 }, 4500);
 
             } catch (e) {
-                errorLog.innerText = "Ошибка соединения";
+                errorLog.innerText = "❌ Ошибка соединения с Firebase";
+                console.error(e);
             }
         }
     </script>
