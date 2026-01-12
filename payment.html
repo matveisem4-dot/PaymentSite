@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Банковский Процессинг 2026 | Secure Terminal</title>
+    <title>Bank Processing 2026 | No-Alerts Edition</title>
     <style>
         :root {
             --accent: #00ff88;
             --bg: #0a0a0f;
-            --card-bg: #161620;
+            --card-inner: #161620;
+            --input-bg: #0d0d14;
             --text: #e0e0e0;
             --error: #ff4757;
         }
@@ -16,7 +17,7 @@
         body {
             background: var(--bg);
             color: var(--text);
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Segoe UI', Roboto, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -25,248 +26,182 @@
             overflow: hidden;
         }
 
-        /* Фоновое свечение */
-        body::before {
-            content: '';
-            position: absolute;
-            width: 300px;
-            height: 300px;
-            background: var(--accent);
-            filter: blur(150px);
-            opacity: 0.1;
-            z-index: -1;
-        }
-
-        .container {
-            width: 400px;
-            background: var(--card-bg);
-            border-radius: 24px;
+        .payment-box {
+            width: 380px;
+            background: var(--card-inner);
+            border-radius: 28px;
             padding: 30px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            box-shadow: 0 25px 60px rgba(0,0,0,0.7);
             border: 1px solid rgba(255,255,255,0.05);
             position: relative;
-            backdrop-filter: blur(10px);
         }
 
-        h2 { margin: 0 0 10px; font-weight: 600; letter-spacing: 1px; color: white; }
-        .subtitle { font-size: 13px; color: #777; margin-bottom: 25px; display: block; }
+        /* Красивое уведомление внутри дизайна */
+        #notify {
+            position: absolute;
+            top: 20px; left: 20px; right: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 13px;
+            text-align: center;
+            transform: translateY(-50px);
+            opacity: 0;
+            transition: 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            z-index: 200;
+        }
+        #notify.show { transform: translateY(0); opacity: 1; }
+        .ntf-error { background: rgba(255, 71, 87, 0.2); color: var(--error); border: 1px solid var(--error); }
+        .ntf-success { background: rgba(0, 255, 136, 0.2); color: var(--accent); border: 1px solid var(--accent); }
 
-        /* Стили полей ввода */
-        .input-group { text-align: left; margin-bottom: 15px; }
-        .input-group label { display: block; font-size: 11px; color: var(--accent); text-transform: uppercase; margin-bottom: 5px; margin-left: 5px; }
+        h2 { margin: 0; text-align: center; letter-spacing: 2px; color: white; font-size: 1.2rem; }
+        .subtitle { display: block; text-align: center; font-size: 10px; color: #555; margin-bottom: 25px; letter-spacing: 1px; }
+
+        .field { margin-bottom: 15px; }
+        .field label { display: block; font-size: 10px; color: var(--accent); text-transform: uppercase; margin-bottom: 6px; font-weight: bold; }
         
         input {
-            width: 100%;
-            padding: 14px;
-            border-radius: 12px;
-            border: 1px solid #2a2a35;
-            background: #0d0d14;
-            color: white;
-            font-size: 16px;
-            font-family: 'Courier New', monospace;
-            box-sizing: border-box;
-            outline: none;
-            transition: 0.3s;
+            width: 100%; padding: 14px; border-radius: 12px;
+            border: 1px solid #2a2a35; background: var(--input-bg);
+            color: white; font-size: 16px; font-family: 'Courier New', monospace;
+            box-sizing: border-box; outline: none; transition: 0.3s;
         }
-        input:focus { border-color: var(--accent); box-shadow: 0 0 15px rgba(0, 255, 136, 0.2); }
-        input::placeholder { color: #444; }
+        input:focus { border-color: var(--accent); background: #11111a; }
 
-        /* Визуальная карта */
-        .card-form {
-            background: linear-gradient(135deg, #1e1e2a 0%, #111118 100%);
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 20px;
+        .visual-card {
+            background: linear-gradient(145deg, #1e1e2d 0%, #0d0d14 100%);
+            padding: 20px; border-radius: 18px; margin-bottom: 20px;
             border: 1px solid rgba(255,255,255,0.03);
         }
 
-        .card-row { display: flex; gap: 10px; margin-top: 10px; }
+        .row { display: flex; gap: 10px; }
 
         button {
-            width: 100%;
-            padding: 18px;
-            border: none;
-            border-radius: 12px;
-            background: var(--accent);
-            color: #000;
-            font-size: 16px;
-            font-weight: 800;
-            cursor: pointer;
-            margin-top: 10px;
-            transition: 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            width: 100%; padding: 18px; border: none; border-radius: 14px;
+            background: var(--accent); color: #050508;
+            font-size: 14px; font-weight: 800; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 1px; transition: 0.3s;
         }
         button:hover { filter: brightness(1.1); transform: translateY(-2px); }
-        button:active { transform: scale(0.98); }
+        button:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; }
 
-        /* Оверлей процессинга */
-        #processing-overlay {
-            display: none;
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--card-bg);
-            border-radius: 24px;
-            z-index: 100;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+        /* Процессинг */
+        #overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--card-inner); border-radius: 28px; z-index: 100;
+            flex-direction: column; justify-content: center; align-items: center;
         }
-
-        .chip-anim {
-            width: 50px; height: 40px;
-            background: #ffd700;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            position: relative;
-            overflow: hidden;
-            background: linear-gradient(45deg, #d4af37, #f1c40f);
-        }
-        .chip-anim::after {
-            content: ''; position: absolute; top: 0; left: -100%;
-            width: 100%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
-            animation: shine 1.5s infinite;
-        }
-        @keyframes shine { to { left: 100%; } }
-
         .spinner {
-            width: 50px; height: 50px;
-            border: 3px solid rgba(0,255,136,0.1);
-            border-top: 3px solid var(--accent);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+            width: 40px; height: 40px; border: 3px solid rgba(0,255,136,0.1);
+            border-top: 3px solid var(--accent); border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        #status-msg { margin-top: 20px; font-size: 13px; color: var(--accent); letter-spacing: 2px; }
-        #error-log { color: var(--error); font-size: 13px; margin-top: 15px; min-height: 1.5em; }
-
+        #status-text { margin-top: 15px; font-size: 11px; color: var(--accent); text-transform: uppercase; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div id="main-ui">
-            <h2>PAYMENT GATEWAY</h2>
-            <span class="subtitle">Secure Cloud Processing v4.0</span>
-            
-            <div class="input-group">
+    <div class="payment-box">
+        <div id="notify"></div>
+
+        <div id="ui-content">
+            <h2>GATEWAY v4.0</h2>
+            <span class="subtitle">Secure No-Alert Processing</span>
+
+            <div class="field">
                 <label>Terminal ID</label>
-                <input type="number" id="tid" placeholder="000000">
+                <input type="number" id="tid" placeholder="Введите ID кассы">
             </div>
 
-            <div class="card-form">
-                <div class="input-group">
+            <div class="visual-card">
+                <div class="field">
                     <label>Card Number</label>
-                    <input type="text" id="card-num" placeholder="0000 0000 0000 0000" maxlength="19">
+                    <input type="text" id="c-num" placeholder="0000 0000 0000 0000" maxlength="19">
                 </div>
-                <div class="card-row">
-                    <div class="input-group" style="flex: 2;">
-                        <label>Expiry Date</label>
-                        <input type="text" id="card-date" placeholder="MM/YY" maxlength="5">
-                    </div>
-                    <div class="input-group" style="flex: 1;">
-                        <label>CVV</label>
-                        <input type="password" id="card-cvv" placeholder="***" maxlength="3">
-                    </div>
+                <div class="row">
+                    <div style="flex:2"><input type="text" id="c-date" placeholder="MM/YY" maxlength="5"></div>
+                    <div style="flex:1"><input type="password" id="c-cvv" placeholder="CVV" maxlength="3"></div>
                 </div>
             </div>
 
-            <div class="input-group">
-                <label>Total Amount (RUB)</label>
-                <input type="number" id="user-sum" placeholder="0.00">
+            <div class="field">
+                <label>Amount (RUB)</label>
+                <input type="number" id="amount" placeholder="0.00">
             </div>
-            
-            <button id="pay-btn" onclick="startPayment()">PROCEED TO PAY</button>
-            <p id="error-log"></p>
+
+            <button id="main-btn" onclick="process()">Pay Now</button>
         </div>
 
-        <div id="processing-overlay">
-            <div class="chip-anim"></div>
+        <div id="overlay">
             <div class="spinner"></div>
-            <div id="status-msg">CONNECTING...</div>
+            <div id="status-text">CONNECTING...</div>
         </div>
     </div>
 
     <script>
-        const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
+        const DB_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
-        // --- МАСКИ ВВОДА ДАННЫХ ---
-        document.getElementById('card-num').addEventListener('input', function (e) {
+        // Функция показа уведомлений вместо alert()
+        function showNotify(text, type = 'error') {
+            const n = document.getElementById('notify');
+            n.innerText = text;
+            n.className = type === 'error' ? 'ntf-error show' : 'ntf-success show';
+            setTimeout(() => n.classList.remove('show'), 3000);
+        }
+
+        // Маски ввода
+        document.getElementById('c-num').addEventListener('input', (e) => {
             e.target.value = e.target.value.replace(/[^\d]/g, '').replace(/(.{4})/g, '$1 ').trim();
         });
-
-        document.getElementById('card-date').addEventListener('input', function (e) {
-            let val = e.target.value.replace(/[^\d]/g, '');
-            if (val.length >= 3) {
-                e.target.value = val.slice(0, 2) + '/' + val.slice(2, 4);
-            } else {
-                e.target.value = val;
-            }
+        document.getElementById('c-date').addEventListener('input', (e) => {
+            let v = e.target.value.replace(/[^\d]/g, '');
+            if (v.length >= 3) e.target.value = v.slice(0,2) + '/' + v.slice(2,4);
         });
 
-        // --- ЛОГИКА ОПЛАТЫ ---
-        async function startPayment() {
+        async function process() {
             const tid = document.getElementById('tid').value;
-            const userSum = document.getElementById('user-sum').value;
-            const cardNum = document.getElementById('card-num').value;
-            const errorLog = document.getElementById('error-log');
-            const overlay = document.getElementById('processing-overlay');
-            const statusMsg = document.getElementById('status-msg');
-
-            if (!tid || !userSum || cardNum.length < 16) {
-                errorLog.innerText = "⚠️ Check Terminal ID and Card Data";
+            const amt = document.getElementById('amount').value;
+            const btn = document.getElementById('main-btn');
+            
+            if (!tid || !amt) {
+                showNotify("Заполните ID и сумму");
                 return;
             }
 
-            errorLog.innerText = "Verifying Terminal...";
-            
+            btn.disabled = true;
+
             try {
-                const response = await fetch(`${FIREBASE_BASE_URL}/status/${tid}.json`);
-                const terminalData = await response.json();
+                const res = await fetch(`${DB_URL}/status/${tid}.json`);
+                const data = await res.json();
 
-                if (!terminalData) {
-                    errorLog.innerText = "❌ Terminal not found";
+                if (!data || data.state !== "WAITING_PAYMENT") {
+                    showNotify("Терминал не готов к оплате");
+                    btn.disabled = false;
                     return;
                 }
 
-                if (terminalData.state !== "WAITING_PAYMENT") {
-                    errorLog.innerText = "❌ Terminal is not ready";
-                    return;
-                }
+                // Запуск процессинга
+                document.getElementById('overlay').style.display = 'flex';
+                const st = document.getElementById('status-text');
 
-                // Симуляция процесса
-                errorLog.innerText = "";
-                overlay.style.display = 'flex';
+                setTimeout(() => st.innerText = "AUTHORIZING...", 1500);
+                setTimeout(() => st.innerText = "SECURE SYNC...", 3000);
 
-                setTimeout(() => { statusMsg.innerText = "ENCRYPTING DATA..."; }, 1000);
-                setTimeout(() => { statusMsg.innerText = "AUTHORIZING..."; }, 2500);
-                setTimeout(() => { statusMsg.innerText = "BANK RESPONSE: OK"; }, 3800);
-
-                // Завершение
                 setTimeout(async () => {
-                    try {
-                        await fetch(`${FIREBASE_BASE_URL}/status/${tid}.json`, {
-                            method: 'PATCH',
-                            body: JSON.stringify({ 
-                                state: "SUCCESS", 
-                                lastUpdate: Date.now() 
-                            })
-                        });
-
-                        statusMsg.innerText = "✅ TRANSACTION COMPLETE";
-                        statusMsg.style.color = "#00ff88";
-                        
-                        setTimeout(() => { location.reload(); }, 2500);
-
-                    } catch (err) {
-                        statusMsg.innerText = "DB WRITE ERROR";
-                    }
+                    await fetch(`${DB_URL}/status/${tid}.json`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ state: "SUCCESS", lastUpdate: Date.now() })
+                    });
+                    
+                    document.getElementById('overlay').style.display = 'none';
+                    showNotify("ОПЛАТА ПРОШЛА УСПЕШНО", "success");
+                    
+                    setTimeout(() => location.reload(), 2500);
                 }, 4500);
 
             } catch (e) {
-                errorLog.innerText = "❌ Connection Failed";
+                showNotify("Ошибка сети. Проверьте связь.");
+                btn.disabled = false;
             }
         }
     </script>
