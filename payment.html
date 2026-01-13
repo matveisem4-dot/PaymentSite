@@ -7,17 +7,16 @@
     <style>
         :root {
             --bg: #050508;
-            --primary: #00ff88; /* Неоновый зеленый */
-            --accent: #4f8aff;  /* Синий из кассы для связи стилей */
+            --primary: #00ff88;
+            --accent: #4f8aff;
             --glass: rgba(255, 255, 255, 0.03);
             --glass-border: rgba(255, 255, 255, 0.1);
         }
 
-        /* === МЕГА ОМЕГА ФОН === */
         body {
             background: var(--bg);
             color: white;
-            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            font-family: 'Inter', sans-serif;
             height: 100vh;
             display: flex;
             justify-content: center;
@@ -27,62 +26,34 @@
             position: relative;
         }
 
-        /* Анимированные туманности */
         .nebula {
             position: absolute;
             width: 80vw; height: 80vw;
             filter: blur(100px);
             border-radius: 50%;
             z-index: -2;
-            opacity: 0.4;
+            opacity: 0.3;
             animation: drift 20s infinite alternate ease-in-out;
         }
         .nebula-1 { top: -20%; left: -20%; background: rgba(0, 255, 136, 0.2); }
-        .nebula-2 { bottom: -20%; right: -10%; background: rgba(79, 138, 255, 0.25); animation-delay: -5s; }
+        .nebula-2 { bottom: -20%; right: -10%; background: rgba(79, 138, 255, 0.25); }
 
         @keyframes drift {
-            from { transform: translate(0, 0) scale(1); }
-            to { transform: translate(10%, 10%) scale(1.2); }
+            from { transform: translate(0, 0); }
+            to { transform: translate(10%, 10%); }
         }
 
-        /* Эффект сканирующих линий (CRT) */
-        body::after {
-            content: "";
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
-            background-size: 100% 3px, 3px 100%;
-            z-index: 10;
-            pointer-events: none;
-        }
-
-        /* === КАРТОЧКА ТЕРМИНАЛА === */
         .card-box {
             position: relative;
             width: 360px;
             padding: 40px;
             border-radius: 30px;
-            background: rgba(15, 15, 25, 0.7);
+            background: rgba(15, 15, 25, 0.8);
             border: 1px solid var(--glass-border);
             backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
             text-align: center;
-            box-shadow: 0 25px 80px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.02);
+            box-shadow: 0 25px 80px rgba(0,0,0,0.8);
             z-index: 5;
-        }
-
-        /* Световой ободок карточки */
-        .card-box::before {
-            content: "";
-            position: absolute; -top: 1px; -left: 1px; -right: 1px; -bottom: 1px;
-            border-radius: 30px;
-            padding: 1px;
-            background: linear-gradient(135deg, var(--glass-border), var(--primary), transparent, var(--accent));
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
-            pointer-events: none;
         }
 
         h2 {
@@ -94,7 +65,6 @@
             -webkit-text-fill-color: transparent;
         }
 
-        /* ПОЛЯ ВВОДА */
         input {
             width: 100%;
             padding: 18px;
@@ -107,20 +77,14 @@
             text-align: center;
             box-sizing: border-box;
             outline: none;
-            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            font-family: 'Courier New', monospace; /* Для вида банковской карты */
+            transition: 0.3s;
         }
 
         input:focus {
             border-color: var(--primary);
-            background: rgba(0, 255, 136, 0.05);
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.15);
-            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
         }
 
-        input::placeholder { color: rgba(255,255,255,0.2); letter-spacing: 1px; }
-
-        /* КНОПКА */
         button {
             width: 100%;
             padding: 20px;
@@ -131,57 +95,28 @@
             font-weight: 900;
             font-size: 18px;
             text-transform: uppercase;
-            letter-spacing: 2px;
             cursor: pointer;
             transition: 0.3s;
-            position: relative;
-            overflow: hidden;
         }
-
-        button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4);
-            filter: brightness(1.1);
-        }
-
-        button:active { transform: translateY(0) scale(0.98); }
 
         button:disabled {
-            background: #1a1a1a;
-            color: #444;
-            transform: none;
-            box-shadow: none;
+            background: #222;
+            color: #555;
+            cursor: not-allowed;
         }
 
-        /* Блик на кнопке */
-        button::after {
-            content: "";
-            position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
-            transform: rotate(45deg);
-            transition: 0.5s;
-        }
-        button:hover::after { left: 100%; }
-
-        #msg {
-            margin-top: 25px;
-            font-size: 14px;
-            font-weight: 600;
-            min-height: 20px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
+        #msg { margin-top: 20px; font-size: 14px; min-height: 20px; font-weight: 600; }
+        
+        /* Анимация мигания для поля суммы, когда она найдена */
+        .amount-active {
+            animation: pulse-border 1.5s infinite;
+            color: var(--primary) !important;
         }
 
-        .secure-tag {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            margin-top: 20px;
-            font-size: 10px;
-            color: rgba(255,255,255,0.3);
-            text-transform: uppercase;
-            letter-spacing: 2px;
+        @keyframes pulse-border {
+            0% { border-color: rgba(0, 255, 136, 0.2); }
+            50% { border-color: rgba(0, 255, 136, 1); }
+            100% { border-color: rgba(0, 255, 136, 0.2); }
         }
     </style>
 </head>
@@ -194,81 +129,92 @@
         <h2>TERMINAL</h2>
         
         <input type="number" id="tid" placeholder="TERMINAL ID">
+        
         <input type="text" id="cnum" placeholder="0000 0000 0000 0000" maxlength="19">
         
         <div style="display:flex; gap:15px">
             <input type="password" id="pin" placeholder="PIN" maxlength="4">
-            <input type="text" id="amt-display" placeholder="0.00 ₽" readonly style="color:var(--primary); font-weight:900; border-color: rgba(0,255,136,0.2);">
+            <input type="text" id="amt-display" placeholder="0.00 ₽" readonly style="font-weight:900;">
         </div>
 
-        <button id="pay-btn" onclick="processPayment()">ОПЛАТИТЬ</button>
+        <button id="pay-btn" onclick="processPayment()" disabled>ЖДЕМ ЗАКАЗ</button>
         <div id="msg"></div>
-
-        <div class="secure-tag">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-            256-bit Secure Encryption
-        </div>
     </div>
 
     <script>
-        const DB = "https://cassa-simulator-4-default-rtdb.firebaseio.com/terminals";
+        // ВАЖНО: Путь должен быть /status/ как в твоем коде кассы!
+        const DB_BASE = "https://cassa-simulator-4-default-rtdb.firebaseio.com/status";
 
-        // Форматирование карты
-        document.getElementById('cnum').addEventListener('input', function(e) {
-            let cursor = e.target.selectionStart;
-            let val = e.target.value.replace(/[^\d]/g, '');
-            let formatted = val.match(/.{1,4}/g)?.join(' ') || val;
-            e.target.value = formatted.substring(0, 19);
+        const tidInput = document.getElementById('tid');
+        const amtDisplay = document.getElementById('amt-display');
+        const payBtn = document.getElementById('pay-btn');
+        const msg = document.getElementById('msg');
+
+        // 1. Форматирование карты
+        document.getElementById('cnum').addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^\d]/g, '').replace(/(.{4})/g, '$1 ').trim();
         });
 
-        async function processPayment() {
-            const tid = document.getElementById('tid').value;
-            const pin = document.getElementById('pin').value;
-            const btn = document.getElementById('pay-btn');
-            const msg = document.getElementById('msg');
-            const amtDisplay = document.getElementById('amt-display');
+        // 2. АВТО-ПОИСК СУММЫ ПРИ ВВОДЕ ID
+        tidInput.addEventListener('input', async () => {
+            const id = tidInput.value;
+            if (id.length < 1) return resetUI();
 
-            if(!tid || pin.length < 4) {
-                msg.innerHTML = "<span style='color:#ff4757'>⚠️ ВВЕДИТЕ ДАННЫЕ</span>";
+            try {
+                const res = await fetch(`${DB_BASE}/${id}.json`);
+                const data = await res.json();
+
+                if (data && data.state === "WAITING_PAYMENT") {
+                    amtDisplay.value = data.amount + " ₽";
+                    amtDisplay.classList.add('amount-active');
+                    payBtn.disabled = false;
+                    payBtn.innerText = "ОПЛАТИТЬ";
+                    msg.innerHTML = "<span style='color:var(--primary)'>✅ ЗАКАЗ НАЙДЕН</span>";
+                } else {
+                    resetUI("Ожидание счета...");
+                }
+            } catch (e) {
+                console.error("Ошибка сети");
+            }
+        });
+
+        function resetUI(text = "ЖДЕМ ЗАКАЗ") {
+            amtDisplay.value = "";
+            amtDisplay.classList.remove('amount-active');
+            payBtn.disabled = true;
+            payBtn.innerText = text;
+            msg.innerText = "";
+        }
+
+        // 3. ОБРАБОТКА ОПЛАТЫ
+        async function processPayment() {
+            const id = tidInput.value;
+            const pin = document.getElementById('pin').value;
+
+            if (pin.length < 4) {
+                msg.innerHTML = "<span style='color:#ff4757'>⚠️ ВВЕДИТЕ PIN</span>";
                 return;
             }
 
-            btn.disabled = true;
-            msg.innerHTML = "<span style='color:var(--accent)'>🔄 СВЯЗЬ С БАНКОМ...</span>";
+            payBtn.disabled = true;
+            payBtn.innerText = "ОБРАБОТКА...";
 
             try {
-                const res = await fetch(`${DB}/${tid}.json`);
-                const data = await res.json();
+                // Отправляем статус SUCCESS в базу
+                await fetch(`${DB_BASE}/${id}.json`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ state: "SUCCESS" })
+                });
 
-                if(!data || data.status !== "WAITING") {
-                    msg.innerHTML = "<span style='color:#ff4757'>❌ ТЕРМИНАЛ НЕАКТИВЕН</span>";
-                    btn.disabled = false;
-                    return;
-                }
+                msg.innerHTML = "<span style='color:var(--primary); font-size: 18px;'>✅ ОПЛАЧЕНО УСПЕШНО</span>";
+                
+                setTimeout(() => {
+                    location.reload();
+                }, 3000);
 
-                amtDisplay.value = data.amount + " ₽";
-                msg.innerHTML = "<span style='color:var(--primary)'>⚡ ПОДТВЕРЖДЕНИЕ...</span>";
-
-                setTimeout(async () => {
-                    await fetch(`${DB}/${tid}.json`, {
-                        method: 'PATCH',
-                        body: JSON.stringify({ status: "PAID_OK" })
-                    });
-
-                    msg.innerHTML = "<span style='color:var(--primary); font-size: 18px;'>✅ ОПЛАЧЕНО</span>";
-                    
-                    // Эффект успеха: вспышка на кнопке
-                    btn.style.background = "#fff";
-                    
-                    setTimeout(() => {
-                        location.reload();
-                    }, 2500);
-
-                }, 2000);
-
-            } catch(e) {
+            } catch (e) {
                 msg.innerHTML = "<span style='color:#ff4757'>❌ ОШИБКА СЕТИ</span>";
-                btn.disabled = false;
+                payBtn.disabled = false;
             }
         }
     </script>
