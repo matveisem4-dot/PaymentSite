@@ -3,245 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Omega Pay Terminal 2026</title>
+    <title>Omega Remote Control</title>
     <style>
-        :root {
-            --bg: #050508;
-            --primary: #00ff88;
-            --accent: #4f8aff;
-            --glass: rgba(255, 255, 255, 0.03);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --error: #ff4757;
-        }
-
-        body {
-            background: var(--bg);
-            color: white;
-            font-family: 'Inter', sans-serif;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 0;
-            overflow: hidden;
-        }
-
-        .card-box {
-            width: 380px;
-            padding: 40px;
-            border-radius: 35px;
-            background: rgba(15, 15, 25, 0.9);
-            border: 1px solid var(--glass-border);
-            backdrop-filter: blur(25px);
-            text-align: center;
-            box-shadow: 0 25px 80px rgba(0,0,0,0.5);
-        }
-
-        h2 {
-            font-weight: 900;
-            letter-spacing: 5px;
-            margin-bottom: 30px;
-            color: var(--primary);
-            text-transform: uppercase;
-        }
-
-        input {
-            width: 100%;
-            padding: 18px;
-            margin-bottom: 15px;
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            color: white;
-            font-size: 18px;
-            text-align: center;
-            box-sizing: border-box;
-            outline: none;
-            transition: 0.3s;
-        }
-
-        input:focus { border-color: var(--primary); }
-
-        .row { display: flex; gap: 10px; margin-bottom: 20px; }
-
-        button {
-            width: 100%;
-            padding: 22px;
-            border-radius: 18px;
-            border: none;
-            background: linear-gradient(135deg, var(--primary), #00cc6e);
-            color: #050508;
-            font-weight: 900;
-            font-size: 18px;
-            text-transform: uppercase;
-            cursor: pointer;
-            box-shadow: 0 10px 20px rgba(0, 255, 136, 0.2);
-        }
-
-        button:disabled {
-            background: #222;
-            color: #555;
-            box-shadow: none;
-            cursor: not-allowed;
-        }
-
-        .status-msg {
-            margin-top: 20px;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .active-status { color: var(--primary); }
-        .inactive-status { color: var(--error); }
-        
-        .footer-info {
-            margin-top: 25px;
-            font-size: 10px;
-            opacity: 0.4;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-        }
+        :root { --primary: #00ff88; --bg: #0a0a0f; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card-box { width: 350px; padding: 30px; border-radius: 30px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px); text-align: center; }
+        h2 { color: var(--primary); letter-spacing: 2px; margin-bottom: 25px; }
+        .info-block { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 15px; margin-bottom: 20px; border-left: 4px solid var(--primary); }
+        input { width: 100%; padding: 15px; margin: 10px 0; border-radius: 12px; border: 1px solid #333; background: #000; color: var(--primary); font-size: 18px; text-align: center; outline: none; }
+        button { width: 100%; padding: 18px; border-radius: 15px; border: none; background: var(--primary); color: #000; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        button:active { transform: scale(0.98); }
+        .status-dot { width: 10px; height: 10px; background: var(--primary); border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 0 10px var(--primary); }
     </style>
 </head>
 <body>
 
     <div class="card-box">
-        <h2>TERMINAL</h2>
+        <h2>OMEGA CONTROL</h2>
         
-        <input type="text" id="tid" placeholder="ЗАГРУЗКА ID..." readonly>
-        
-        <input type="text" id="cnum" placeholder="0000 0000 0000 0000">
-        
-        <div class="row">
-            <input type="password" id="pin" placeholder="PIN" maxlength="4" style="margin-bottom:0">
-            <input type="text" id="amt-display" placeholder="0.00 ₽" readonly style="margin-bottom:0; color:var(--primary); font-weight:bold;">
+        <div class="info-block">
+            <div style="font-size: 12px; opacity: 0.6;">ТЕРМИНАЛ ID</div>
+            <div id="display-id" style="font-weight: bold; font-size: 20px;">------</div>
         </div>
 
-        <button id="pay-btn" onclick="processPayment()" disabled>ЖДЕМ ЗАКАЗ</button>
-
-        <div id="status-container" class="status-msg inactive-status">
-            <span id="status-icon">❌</span> <span id="status-text">ТЕРМИНАЛ НЕАКТИВЕН</span>
+        <div id="order-info" style="margin-bottom: 20px;">
+            <div style="font-size: 14px; margin-bottom: 5px;">СУММА К ОПЛАТЕ:</div>
+            <div id="display-amt" style="font-size: 32px; font-weight: 900; color: var(--primary);">0.00 ₽</div>
         </div>
 
-        <div class="footer-info">
-            🔒 256-BIT SECURE ENCRYPTION
-        </div>
+        <input type="text" id="card-num" placeholder="НОМЕР КАРТЫ">
+        <input type="password" id="card-pin" placeholder="PIN-CODE" maxlength="4">
+
+        <button id="pay-btn" onclick="sendPaymentSignal()">ПОДТВЕРДИТЬ ОПЛАТУ</button>
+        <div id="status" style="margin-top: 15px; font-size: 12px; opacity: 0.7;">СИНХРОНИЗАЦИЯ...</div>
     </div>
 
     <script>
         const DB_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
         
-        // Получаем ID терминала
+        // Используем тот же ID, что и Сбер
         const TID = localStorage.getItem('terminal_id') || Math.floor(100000 + Math.random() * 900000).toString();
         localStorage.setItem('terminal_id', TID);
-        document.getElementById('tid').value = TID;
+        document.getElementById('display-id').innerText = TID;
 
         let currentAmount = 0;
 
-        // 1. Постоянная проверка новых заказов (Активность терминала)
-        async function syncTerminal() {
+        // Омега слушает папку commands, чтобы видеть, что сейчас на экране Сбера
+        async function watchSber() {
             try {
                 const res = await fetch(`${DB_URL}/commands/${TID}.json`);
                 const data = await res.json();
-
-                const statusCont = document.getElementById('status-container');
-                const statusText = document.getElementById('status-text');
-                const statusIcon = document.getElementById('status-icon');
-                const payBtn = document.getElementById('pay-btn');
+                const btn = document.getElementById('pay-btn');
+                const status = document.getElementById('status');
 
                 if (data && data.command === "PAY") {
-                    // ЕСЛИ ЗАКАЗ ЕСТЬ
                     currentAmount = data.amount;
-                    document.getElementById('amt-display').value = currentAmount + " ₽";
-                    
-                    statusCont.className = "status-msg active-status";
-                    statusText.innerText = "ТЕРМИНАЛ АКТИВЕН";
-                    statusIcon.innerText = "⚡";
-                    
-                    payBtn.disabled = false;
-                    payBtn.innerText = "ОПЛАТИТЬ";
+                    document.getElementById('display-amt').innerText = currentAmount + " ₽";
+                    btn.disabled = false;
+                    btn.style.opacity = "1";
+                    status.innerHTML = '<span class="status-dot"></span> ЖДЕТ ОПЛАТЫ';
                 } else {
-                    // ЕСЛИ ЗАКАЗА НЕТ
-                    statusCont.className = "status-msg inactive-status";
-                    statusText.innerText = "ТЕРМИНАЛ НЕАКТИВЕН";
-                    statusIcon.innerText = "❌";
-                    
-                    payBtn.disabled = true;
-                    payBtn.innerText = "ЖДЕМ ЗАКАЗ";
-                    document.getElementById('amt-display').value = "0.00 ₽";
+                    document.getElementById('display-amt').innerText = "0.00 ₽";
+                    btn.disabled = true;
+                    btn.style.opacity = "0.3";
+                    status.innerText = "НЕТ АКТИВНЫХ ЗАКАЗОВ";
                 }
-            } catch (e) {
-                console.error("Ошибка связи");
-            }
+            } catch (e) { console.error("Ошибка связи"); }
         }
 
-        // 2. Логика оплаты
-        async function processPayment() {
-            const cardInput = document.getElementById('cnum').value.replace(/\s/g, '');
-            const pinInput = document.getElementById('pin').value;
-            const payBtn = document.getElementById('pay-btn');
-
-            if (cardInput.length < 12 || pinInput.length < 4) {
-                alert("Проверьте данные карты и ПИН!");
-                return;
-            }
-
-            payBtn.disabled = true;
-            payBtn.innerText = "СВЯЗЬ...";
+        // САМАЯ ВАЖНАЯ ЧАСТЬ: Отправка сигнала в папку, которую ждет Сбер
+        async function sendPaymentSignal() {
+            const btn = document.getElementById('pay-btn');
+            btn.innerText = "ОТПРАВКА...";
+            btn.disabled = true;
 
             try {
-                const res = await fetch(`${DB_URL}/cards/${cardInput}.json`);
-                const card = await res.json();
+                // 1. Сначала записываем статус SUCCESS в /status/ID (чтобы сработал finishPay в Сбере)
+                await fetch(`${DB_URL}/status/${TID}.json`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ 
+                        state: "SUCCESS", 
+                        lastUpdate: Date.now() 
+                    })
+                });
 
-                if (card && card.pin == pinInput) {
-                    if (card.balance >= currentAmount) {
-                        // СПИСАНИЕ
-                        await fetch(`${DB_URL}/cards/${cardInput}.json`, {
-                            method: 'PATCH',
-                            body: JSON.stringify({ balance: card.balance - currentAmount })
-                        });
+                // 2. Удаляем команду из /commands/ID, чтобы Сбер убрал экран оплаты
+                await fetch(`${DB_URL}/commands/${TID}.json`, { method: 'DELETE' });
 
-                        // СТАТУС ДЛЯ КАССЫ
-                        await fetch(`${DB_URL}/status/${TID}.json`, {
-                            method: 'PUT',
-                            body: JSON.stringify({ state: "SUCCESS" })
-                        });
+                btn.innerText = "ОПЛАЧЕНО ✅";
+                btn.style.background = "white";
 
-                        // УДАЛЯЕМ КОМАНДУ
-                        await fetch(`${DB_URL}/commands/${TID}.json`, { method: 'DELETE' });
+                // Перезагрузка через 3 сек
+                setTimeout(() => location.reload(), 3000);
 
-                        payBtn.innerText = "ГОТОВО ✅";
-                        payBtn.style.background = "white";
-                        
-                        setTimeout(() => location.reload(), 3000);
-                    } else {
-                        alert("Недостаточно средств!");
-                        syncTerminal();
-                    }
-                } else {
-                    alert("Ошибка карты или ПИН!");
-                    syncTerminal();
-                }
             } catch (e) {
-                alert("Ошибка сети!");
-                syncTerminal();
+                alert("Ошибка при передаче сигнала!");
+                btn.disabled = false;
+                btn.innerText = "ПОДТВЕРДИТЬ ОПЛАТУ";
             }
         }
 
-        // Форматирование номера карты (пробелы)
-        document.getElementById('cnum').addEventListener('input', (e) => {
-            e.target.value = e.target.value.replace(/[^\d]/g, '').replace(/(.{4})/g, '$1 ').trim();
-        });
-
-        // Запуск проверки каждые 2 секунды
-        setInterval(syncTerminal, 2000);
+        // Проверяем состояние каждые 2 секунды
+        setInterval(watchSber, 2000);
     </script>
 </body>
 </html>
