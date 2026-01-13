@@ -3,163 +3,113 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Система Оплаты | Безопасный Шлюз</title>
+    <title>Банковский Терминал</title>
     <style>
-        :root {
-            --accent: #00d2ff;
-            --bg: #0b0d17;
-            --card-bg: rgba(26, 29, 46, 0.8);
-            --input-bg: #05060a;
-            --text: #ffffff;
+        :root { --bg: #050508; --glass: rgba(255,255,255,0.05); --green: #00ff88; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; }
+        
+        .card-box {
+            width: 320px; padding: 30px; border-radius: 20px;
+            background: var(--glass); border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(15px); text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
-
-        body {
-            background: var(--bg);
-            background-image: radial-gradient(circle at 50% 50%, #161b33 0%, #0b0d17 100%);
-            color: var(--text);
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            display: flex; justify-content: center; align-items: center;
-            height: 100vh; margin: 0;
-        }
-
-        /* Уведомление об ошибках/успехе */
-        #status-msg {
-            position: fixed; top: 30px; padding: 15px 30px;
-            border-radius: 12px; font-weight: 600; font-size: 14px;
-            opacity: 0; transform: translateY(-20px);
-            transition: 0.4s; backdrop-filter: blur(10px); z-index: 1000;
-        }
-        #status-msg.active { opacity: 1; transform: translateY(0); }
-        .error { border: 1px solid #ff4757; color: #ff4757; background: rgba(255, 71, 87, 0.1); }
-        .success { border: 1px solid #00ff88; color: #00ff88; background: rgba(0, 255, 136, 0.1); }
-
-        .payment-box {
-            width: 380px; padding: 40px; border-radius: 28px;
-            background: var(--card-bg);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(20px);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
-            text-align: center;
-        }
-
-        h1 { font-size: 1.4rem; margin: 0; letter-spacing: 1px; font-weight: 800; text-transform: uppercase; }
-        .subtitle { color: #556; font-size: 10px; margin-bottom: 30px; letter-spacing: 2px; }
-
-        .field { text-align: left; margin-bottom: 20px; }
-        label { display: block; font-size: 10px; color: var(--accent); margin-bottom: 8px; font-weight: 800; text-transform: uppercase; }
 
         input {
-            width: 100%; background: var(--input-bg); border: 1px solid #2d314d;
-            padding: 15px; border-radius: 14px; color: white; font-size: 18px;
-            font-family: 'Consolas', monospace; outline: none; transition: 0.3s;
-            box-sizing: border-box; text-align: center;
+            width: 100%; padding: 15px; margin-bottom: 15px;
+            background: rgba(0,0,0,0.3); border: 1px solid #333;
+            border-radius: 10px; color: white; font-size: 16px;
+            text-align: center; box-sizing: border-box; outline: none;
         }
-        input:focus { border-color: var(--accent); box-shadow: 0 0 15px rgba(0, 210, 255, 0.2); }
-
-        .row { display: flex; gap: 15px; }
+        input:focus { border-color: var(--green); }
 
         button {
-            width: 100%; padding: 18px; border: none; border-radius: 15px;
-            background: var(--accent); color: #000; font-size: 15px;
-            font-weight: 800; cursor: pointer; text-transform: uppercase;
-            letter-spacing: 1px; transition: 0.3s; margin-top: 10px;
+            width: 100%; padding: 18px; border-radius: 10px; border: none;
+            background: var(--green); color: #000; font-weight: 800; font-size: 16px;
+            cursor: pointer; transition: 0.3s;
         }
-        button:hover { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 10px 20px rgba(0, 210, 255, 0.2); }
-        button:disabled { background: #222; color: #555; cursor: not-allowed; transform: none; box-shadow: none; }
+        button:hover { transform: translateY(-3px); box-shadow: 0 0 20px rgba(0, 255, 136, 0.4); }
+        button:disabled { background: #333; color: #555; transform: none; box-shadow: none; }
 
-        #loader { display: none; margin-top: 20px; font-size: 12px; color: var(--accent); letter-spacing: 2px; }
+        #msg { margin-top: 15px; font-size: 14px; min-height: 20px; }
     </style>
 </head>
 <body>
 
-    <div id="status-msg"></div>
-
-    <div class="payment-box">
-        <h1>БАНКОВСКИЙ ШЛЮЗ</h1>
-        <div class="subtitle">Безопасная обработка транзакции</div>
-
-        <div class="field">
-            <label>ID ТЕРМИНАЛА</label>
-            <input type="number" id="tid" placeholder="Введите ID кассы">
+    <div class="card-box">
+        <h2 style="margin: 0 0 20px;">ОПЛАТА ЗАКАЗА</h2>
+        
+        <input type="number" id="tid" placeholder="Введите ID Кассы">
+        <input type="text" id="cnum" placeholder="0000 0000 0000 0000" maxlength="19">
+        
+        <div style="display:flex; gap:10px">
+            <input type="password" id="pin" placeholder="PIN" maxlength="4">
+            <input type="text" id="amt-display" placeholder="Сумма" readonly style="color:var(--green); font-weight:bold">
         </div>
 
-        <div class="field">
-            <label>НОМЕР КАРТЫ</label>
-            <input type="text" id="c-num" placeholder="0000 0000 0000 0000" maxlength="19">
-        </div>
-
-        <div class="row">
-            <div class="field" style="flex: 1;">
-                <label>ПИН-КОД</label>
-                <input type="password" id="pin" placeholder="****" maxlength="4" style="letter-spacing: 5px;">
-            </div>
-            <div class="field" style="flex: 1.5;">
-                <label>СУММА (РУБ)</label>
-                <input type="number" id="amt" placeholder="0.00" style="color: #00ff88;">
-            </div>
-        </div>
-
-        <button id="pay-btn" onclick="start()">ПОДТВЕРДИТЬ ОПЛАТУ</button>
-        <div id="loader">ОБРАБОТКА ДАННЫХ...</div>
+        <button id="pay-btn" onclick="processPayment()">ОПЛАТИТЬ</button>
+        <div id="msg"></div>
     </div>
 
     <script>
-        const DB = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
+        const DB = "https://cassa-simulator-4-default-rtdb.firebaseio.com/terminals";
 
-        function notify(text, isOk) {
-            const m = document.getElementById('status-msg');
-            m.innerText = text;
-            m.className = isOk ? 'success active' : 'error active';
-            setTimeout(() => m.classList.remove('active'), 3000);
-        }
-
-        // Форматирование карты
-        document.getElementById('c-num').addEventListener('input', (e) => {
+        // Формат карты (пробелы)
+        document.getElementById('cnum').addEventListener('input', function(e) {
             e.target.value = e.target.value.replace(/[^\d]/g, '').replace(/(.{4})/g, '$1 ').trim();
         });
 
-        async function start() {
+        async function processPayment() {
             const tid = document.getElementById('tid').value;
-            const amt = document.getElementById('amt').value;
             const pin = document.getElementById('pin').value;
             const btn = document.getElementById('pay-btn');
-            const loader = document.getElementById('loader');
+            const msg = document.getElementById('msg');
+            const amtDisplay = document.getElementById('amt-display');
 
-            if (!tid || !amt || pin.length < 4) {
-                notify("Пожалуйста, заполните все поля корректно", false);
+            if(!tid || pin.length < 4) {
+                msg.innerText = "❌ Введите ID кассы и PIN код";
                 return;
             }
 
             btn.disabled = true;
-            loader.style.display = 'block';
+            msg.innerText = "🔄 Поиск терминала...";
 
             try {
-                const res = await fetch(`${DB}/status/${tid}.json`);
+                // 1. Проверяем, есть ли такой терминал и ждет ли он оплаты
+                const res = await fetch(`${DB}/${tid}.json`);
                 const data = await res.json();
 
-                if (!data || data.state !== "WAITING_PAYMENT") {
-                    notify("Ошибка: Терминал не готов к приему оплаты", false);
+                if(!data || data.status !== "WAITING") {
+                    msg.innerText = "❌ Терминал не найден или не ждет оплату";
                     btn.disabled = false;
-                    loader.style.display = 'none';
                     return;
                 }
 
-                // Имитация задержки банка
-                setTimeout(async () => {
-                    await fetch(`${DB}/status/${tid}.json`, {
-                        method: 'PATCH',
-                        body: JSON.stringify({ state: "SUCCESS", lastUpdate: Date.now() })
-                    });
-                    
-                    loader.style.display = 'none';
-                    notify("ТРАНЗАКЦИЯ ОДОБРЕНА", true);
-                    setTimeout(() => location.reload(), 2500);
-                }, 3500);
+                // Показываем сумму
+                amtDisplay.value = data.amount + " ₽";
+                msg.innerText = "🔄 Обработка транзакции...";
 
-            } catch (e) {
-                notify("Ошибка связи с сервером", false);
+                // Имитация задержки банка (2 секунды)
+                setTimeout(async () => {
+                    
+                    // 2. Отправляем статус УСПЕХА
+                    await fetch(`${DB}/${tid}.json`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ status: "PAID_OK" })
+                    });
+
+                    msg.innerHTML = "<b style='color:#00ff88'>✅ ОПЛАТА ПРОШЛА!</b>";
+                    
+                    setTimeout(() => {
+                        location.reload(); // Перезагружаем страницу для нового клиента
+                    }, 3000);
+
+                }, 2000);
+
+            } catch(e) {
+                console.error(e);
+                msg.innerText = "❌ Ошибка связи с сервером";
                 btn.disabled = false;
-                loader.style.display = 'none';
             }
         }
     </script>
