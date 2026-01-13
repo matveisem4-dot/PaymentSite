@@ -2,174 +2,79 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Оплата заказа</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omega Pay</title>
     <style>
-        :root { --primary: #00ff88; --error: #ff4757; --bg: #0a0a0f; }
-        body { background: var(--bg); color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-        
-        .pay-card { 
-            width: 100%; max-width: 400px; padding: 30px; border-radius: 30px; 
-            background: #16161e; border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6); text-align: center;
-        }
-
-        h2 { font-size: 22px; margin-bottom: 25px; letter-spacing: 1px; }
-        
-        .input-group { text-align: left; margin-bottom: 15px; }
-        label { display: block; font-size: 12px; color: #888; margin-bottom: 8px; margin-left: 5px; text-transform: uppercase; }
-        
-        input {
-            width: 100%; padding: 16px; border-radius: 15px; border: 1px solid #2e2e3a;
-            background: #000; color: white; font-size: 18px; outline: none; transition: 0.3s;
-            box-sizing: border-box;
-        }
-        input:focus { border-color: var(--primary); box-shadow: 0 0 10px rgba(0,255,136,0.2); }
-        input::placeholder { color: #444; }
-
-        .amt-box { 
-            background: rgba(0,255,136,0.05); padding: 20px; border-radius: 20px; 
-            margin: 20px 0; border: 1px solid rgba(0,255,136,0.2);
-        }
-        .amt-display { font-size: 36px; font-weight: 800; color: var(--primary); }
-
-        button {
-            width: 100%; padding: 20px; border-radius: 18px; border: none;
-            background: var(--primary); color: #000; font-weight: bold;
-            font-size: 18px; cursor: pointer; transition: 0.3s; margin-top: 10px;
-        }
-        button:disabled { background: #2e2e3a; color: #555; cursor: not-allowed; }
-
-        #error-msg { color: var(--error); font-size: 13px; margin-top: 15px; min-height: 18px; }
-        
-        /* Анимация при вводе неверного ID */
-        .shake { animation: shake 0.4s; }
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-10px); }
-            75% { transform: translateX(10px); }
-        }
+        body { background: #0a0a0f; color: white; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .card { width: 100%; max-width: 350px; background: #16161e; padding: 25px; border-radius: 25px; text-align: center; border: 1px solid #333; }
+        input { width: 100%; padding: 15px; margin: 10px 0; border-radius: 12px; border: 1px solid #333; background: #000; color: #00ff88; font-size: 18px; text-align: center; box-sizing: border-box; }
+        button { width: 100%; padding: 18px; border-radius: 12px; border: none; background: #00ff88; color: black; font-weight: bold; font-size: 16px; cursor: pointer; }
+        button:disabled { background: #222; color: #555; }
+        .price { font-size: 32px; color: #00ff88; margin: 15px 0; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div class="pay-card" id="card-ui">
-        <h2>ОПЛАТА ТОВАРА</h2>
+    <div class="card">
+        <h2>ОПЛАТА ЗАКАЗА</h2>
+        <input type="text" id="target-id" placeholder="ВВЕДИТЕ ID" maxlength="6">
         
-        <div class="input-group">
-            <label>Введите ID с экрана терминала</label>
-            <input type="text" id="tid" placeholder="000000" maxlength="6" inputmode="numeric">
-        </div>
+        <div id="amt-display" class="price">0.00 ₽</div>
 
-        <div class="amt-box">
-            <div id="amt-text" style="font-size: 12px; color: #888; margin-bottom: 5px;">СУММА К ОПЛАТЕ</div>
-            <div id="amt-val" class="amt-display">0.00 ₽</div>
-        </div>
+        <input type="text" id="c-num" placeholder="НОМЕР КАРТЫ">
+        <input type="password" id="c-pin" placeholder="PIN" maxlength="4">
 
-        <div class="input-group">
-            <label>Данные карты</label>
-            <input type="text" id="c-num" placeholder="0000 0000 0000 0000" inputmode="numeric">
-            <input type="password" id="c-pin" placeholder="ПИН-КОД" maxlength="4" inputmode="numeric" style="margin-top: 10px;">
-        </div>
-
-        <button id="pay-btn" onclick="processClientPayment()" disabled>ОПЛАТИТЬ</button>
-        
-        <div id="error-msg"></div>
+        <button id="pay-btn" onclick="sendPay()" disabled>ОПЛАТИТЬ</button>
+        <p id="msg" style="font-size: 12px; color: #888; margin-top: 10px;"></p>
     </div>
 
     <script>
-        const DB_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
-        const tidInput = document.getElementById('tid');
-        const btn = document.getElementById('pay-btn');
-        const errorMsg = document.getElementById('error-msg');
-
-        let currentAmount = 0;
-
-        // Постоянная проверка ID
-        async function checkOrder() {
-            const id = tidInput.value.trim();
-            if (id.length < 6) {
-                resetUI();
-                return;
-            }
+        const DB = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
+        
+        async function check() {
+            const id = document.getElementById('target-id').value.trim();
+            if (id.length < 6) return;
 
             try {
-                const res = await fetch(`${DB_URL}/commands/${id}.json`);
+                const res = await fetch(`${DB}/commands/${id}.json`);
                 const data = await res.json();
+                const btn = document.getElementById('pay-btn');
 
                 if (data && data.command === "PAY") {
-                    currentAmount = data.amount;
-                    document.getElementById('amt-val').innerText = currentAmount + " ₽";
+                    document.getElementById('amt-display').innerText = data.amount + " ₽";
                     btn.disabled = false;
-                    errorMsg.innerText = "";
+                    document.getElementById('msg').innerText = "Заказ найден";
                 } else {
-                    resetUI("Заказ для этого ID не найден");
+                    document.getElementById('amt-display').innerText = "0.00 ₽";
+                    btn.disabled = true;
+                    document.getElementById('msg').innerText = "Ожидание заказа для этого ID...";
                 }
-            } catch (e) {
-                showError("Ошибка связи с сервером");
-            }
+            } catch (e) {}
         }
 
-        function resetUI(msg = "") {
-            document.getElementById('amt-val').innerText = "0.00 ₽";
+        async function sendPay() {
+            const id = document.getElementById('target-id').value.trim();
+            const btn = document.getElementById('pay-btn');
+            
             btn.disabled = true;
-            errorMsg.innerText = msg;
-        }
-
-        function showError(msg) {
-            errorMsg.innerText = msg;
-            const ui = document.getElementById('card-ui');
-            ui.classList.add('shake');
-            setTimeout(() => ui.classList.remove('shake'), 4000);
-        }
-
-        async function processClientPayment() {
-            const id = tidInput.value.trim();
-            const card = document.getElementById('c-num').value.replace(/\s/g, '');
-            const pin = document.getElementById('c-pin').value;
-
-            // Проверки (ошибки)
-            if (card.length < 16) {
-                showError("Введите полный номер карты (16 цифр)");
-                return;
-            }
-            if (pin.length < 4) {
-                showError("Введите 4 цифры ПИН-кода");
-                return;
-            }
-
-            btn.innerText = "ОБРАБОТКА...";
-            btn.disabled = true;
+            btn.innerText = "ОТПРАВКА...";
 
             try {
-                // Имитация проверки карты (в реале тут запрос к базе /cards/)
-                // Для простоты — сразу шлем сигнал успеха терминалу
-                
-                await fetch(`${DB_URL}/status/${id}.json`, {
+                // ОТПРАВЛЯЕМ СИГНАЛ В ПАПКУ STATUS ТОГО ID, КОТОРЫЙ ВВЕЛ КЛИЕНТ
+                await fetch(`${DB}/status/${id}.json`, {
                     method: 'PATCH',
-                    body: JSON.stringify({ state: "SUCCESS", lastUpdate: Date.now() })
+                    body: JSON.stringify({ state: "SUCCESS", time: Date.now() })
                 });
 
-                await fetch(`${DB_URL}/commands/${id}.json`, { method: 'DELETE' });
-
-                btn.style.background = "white";
-                btn.innerText = "ОПЛАЧЕНО УСПЕШНО ✅";
-                
-                setTimeout(() => location.reload(), 4000);
-
+                btn.innerText = "ГОТОВО ✅";
+                setTimeout(() => location.reload(), 3000);
             } catch (e) {
-                showError("Ошибка транзакции");
+                alert("Ошибка!");
                 btn.disabled = false;
-                btn.innerText = "ОПЛАТИТЬ";
             }
         }
 
-        // Красивое форматирование номера карты
-        document.getElementById('c-num').addEventListener('input', function (e) {
-            e.target.value = e.target.value.replace(/[^\d]/g, '').replace(/(.{4})/g, '$1 ').trim();
-        });
-
-        setInterval(checkOrder, 2000);
+        setInterval(check, 2000);
     </script>
 </body>
 </html>
