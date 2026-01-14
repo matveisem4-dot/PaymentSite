@@ -8,16 +8,17 @@
         body { background: #0a0a0f; color: white; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
         .card { width: 100%; max-width: 350px; background: #16161e; padding: 25px; border-radius: 25px; text-align: center; border: 1px solid #333; }
         input { width: 100%; padding: 15px; margin: 10px 0; border-radius: 12px; border: 1px solid #333; background: #000; color: #00ff88; font-size: 18px; text-align: center; box-sizing: border-box; }
-        button { width: 100%; padding: 18px; border-radius: 12px; border: none; background: #00ff88; color: black; font-weight: bold; font-size: 16px; cursor: pointer; }
-        button:disabled { background: #222; color: #555; }
+        button { width: 100%; padding: 18px; border-radius: 12px; border: none; background: #00ff88; color: black; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s; }
+        button:disabled { background: #222; color: #555; cursor: not-allowed; }
         .price { font-size: 32px; color: #00ff88; margin: 15px 0; font-weight: bold; }
+        .status-msg { font-size: 13px; min-height: 20px; margin-top: 10px; transition: color 0.3s; }
     </style>
 </head>
 <body>
 
     <div class="card">
         <h2>ОПЛАТА ЗАКАЗА</h2>
-        <input type="text" id="target-id" placeholder="ВВЕДИТЕ ID" maxlength="6">
+        <input type="text" id="target-id" placeholder="ВВЕДИТЕ ID ТЕРМИНАЛА" maxlength="6">
         
         <div id="amt-display" class="price">0.00 ₽</div>
 
@@ -25,56 +26,149 @@
         <input type="password" id="c-pin" placeholder="PIN" maxlength="4">
 
         <button id="pay-btn" onclick="sendPay()" disabled>ОПЛАТИТЬ</button>
-        <p id="msg" style="font-size: 12px; color: #888; margin-top: 10px;"></p>
+        <p id="msg" class="status-msg"></p>
     </div>
 
     <script>
         const DB = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
+        let currentOrderAmount = 0;
         
+        // Функция проверки активных заказов на указанном ID
         async function check() {
             const id = document.getElementById('target-id').value.trim();
-            if (id.length < 6) return;
+            const msgEl = document.getElementById('msg');
+            const btn = document.getElementById('pay-btn');
+
+            if (id.length < 6) {
+                msgEl.innerText = "Введите 6 цифр ID";
+                msgEl.style.color = "#888";
+                return;
+            }
 
             try {
                 const res = await fetch(`${DB}/commands/${id}.json`);
                 const data = await res.json();
-                const btn = document.getElementById('pay-btn');
 
                 if (data && data.command === "PAY") {
+                    currentOrderAmount = data.amount;
                     document.getElementById('amt-display').innerText = data.amount + " ₽";
-                    btn.disabled = false;
-                    document.getElementById('msg').innerText = "Заказ найден";
+                    if (btn.innerText !== "ОТПРАВКА...") btn.disabled = false;
+                    msgEl.innerText = "Заказ найден. Введите данные карты.";
+                    msgEl.style.color = "#00ff88";
                 } else {
+                    currentOrderAmount = 0;
                     document.getElementById('amt-display').innerText = "0.00 ₽";
                     btn.disabled = true;
-                    document.getElementById('msg').innerText = "Ожидание заказа для этого ID...";
+                    msgEl.innerText = "Ожидание команды оплаты на терминале...";
+                    msgEl.style.color = "#888";
                 }
-            } catch (e) {}
-        }
-
-        async function sendPay() {
-            const id = document.getElementById('target-id').value.trim();
-            const btn = document.getElementById('pay-btn');
-            
-            btn.disabled = true;
-            btn.innerText = "ОТПРАВКА...";
-
-            try {
-                // ОТПРАВЛЯЕМ СИГНАЛ В ПАПКУ STATUS ТОГО ID, КОТОРЫЙ ВВЕЛ КЛИЕНТ
-                await fetch(`${DB}/status/${id}.json`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ state: "SUCCESS", time: Date.now() })
-                });
-
-                btn.innerText = "ГОТОВО ✅";
-                setTimeout(() => location.reload(), 3000);
             } catch (e) {
-                alert("Ошибка!");
-                btn.disabled = false;
+                console.error("Ошибка связи:", e);
             }
         }
 
-        setInterval(check, 2000);
+        // Логика оплаты
+       async function sendPay() {
+    const id = document.getElementById('target-id').value.trim();
+    const cardNum = document.getElementById('c-num').value.trim();
+    const cardPin = document.getElementById('c-pin').value.trim();
+    const btn = document.getElementById('pay-btn');
+    
+    btn.disabled = true;
+    btn.innerText = "ПРОВЕРКА...";
+
+    try {
+        // 1. Проверяем карту (обязательно!)
+        const cardRes = await fetch(`${DB}/cards/${cardNum}.json`);
+        const cardData = await cardRes.json();
+
+        if (cardData && cardData.pin == cardPin) {
+            if (cardData.balance >= currentOrderAmount) {
+                
+                // 2. Списываем деньги
+                await fetch(`${DB}/cards/${cardNum}.json`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ balance: cardData.balance - currentOrderAmount })
+                });
+
+                // 3. ВАЖНО: Сначала пишем статус SUCCESS для Терминала
+                // Мы используем PUT, чтобы полностью перезаписать состояние и Терминал его увидел
+                await fetch(`${DB}/status/${id}.json`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ 
+                        state: "SUCCESS", 
+                        lastUpdate: Date.now(),
+                        method: "CARD_OMEGA" 
+                    })
+                });
+
+                // 4. Даем терминалу 1 секунду "увидеть" статус, прежде чем удалять команду
+                setTimeout(async () => {
+                    await fetch(`${DB}/commands/${id}.json`, { method: 'DELETE' });
+                    btn.innerText = "ГОТОВО ✅";
+                    document.getElementById('msg').innerText = "Оплачено! Терминал подтвердил.";
+                }, 1000);
+
+                setTimeout(() => location.reload(), 4000);
+
+            } else {
+                alert("Недостаточно денег!");
+                btn.disabled = false;
+                btn.innerText = "ОПЛАТИТЬ";
+            }
+        } else {
+            alert("Карта не найдена или неверный ПИН");
+            btn.disabled = false;
+            btn.innerText = "ОПЛАТИТЬ";
+        }
+    } catch (e) {
+        alert("Ошибка связи с базой!");
+        btn.disabled = false;
+    }
+}
+                // 1. Проверяем баланс карты в БД (как в первом коде)
+                const cardRes = await fetch(`${DB}/cards/${cardNum}.json`);
+                const cardData = await cardRes.json();
+
+                if (cardData && cardData.pin == cardPin) {
+                    if (cardData.balance >= currentOrderAmount) {
+                        
+                        // 2. Списываем деньги
+                        await fetch(`${DB}/cards/${cardNum}.json`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ balance: cardData.balance - currentOrderAmount })
+                        });
+
+                        // 3. Отправляем статус SUCCESS терминалу
+                        await fetch(`${DB}/status/${id}.json`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ state: "SUCCESS", lastUpdate: Date.now() })
+                        });
+
+                        // 4. Удаляем команду, чтобы она не сработала дважды
+                        await fetch(`${DB}/commands/${id}.json`, { method: 'DELETE' });
+
+                        btn.innerText = "ГОТОВО ✅";
+                        msgEl.innerText = "Оплата прошла успешно!";
+                        setTimeout(() => location.reload(), 3000);
+                    } else {
+                        alert("Недостаточно средств на карте!");
+                        btn.disabled = false;
+                        btn.innerText = "ОПЛАТИТЬ";
+                    }
+                } else {
+                    alert("Неверный номер карты или PIN!");
+                    btn.disabled = false;
+                    btn.innerText = "ОПЛАТИТЬ";
+                }
+            } catch (e) {
+                alert("Ошибка сети!");
+                btn.disabled = false;
+                btn.innerText = "ОПЛАТИТЬ";
+            }
+        }
+
+        setInterval(check, 2500);
     </script>
 </body>
 </html>
