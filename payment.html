@@ -34,39 +34,32 @@
         let currentOrderAmount = 0;
         
         // Функция проверки активных заказов на указанном ID
-        async function check() {
-            const id = document.getElementById('target-id').value.trim();
-            const msgEl = document.getElementById('msg');
-            const btn = document.getElementById('pay-btn');
+       async function check() {
+    const id = document.getElementById('target-id').value.trim();
+    const btn = document.getElementById('pay-btn');
+    const msgEl = document.getElementById('msg');
 
-            if (id.length < 6) {
-                msgEl.innerText = "Введите 6 цифр ID";
-                msgEl.style.color = "#888";
-                return;
-            }
+    if (id.length < 6) return;
 
-            try {
-                const res = await fetch(`${DB}/commands/${id}.json`);
-                const data = await res.json();
+    try {
+        const res = await fetch(`${DB}/commands/${id}.json`);
+        const data = await res.json();
 
-                if (data && data.command === "PAY") {
-                    currentOrderAmount = data.amount;
-                    document.getElementById('amt-display').innerText = data.amount + " ₽";
-                    if (btn.innerText !== "ОТПРАВКА...") btn.disabled = false;
-                    msgEl.innerText = "Заказ найден. Введите данные карты.";
-                    msgEl.style.color = "#00ff88";
-                } else {
-                    currentOrderAmount = 0;
-                    document.getElementById('amt-display').innerText = "0.00 ₽";
-                    btn.disabled = true;
-                    msgEl.innerText = "Ожидание команды оплаты на терминале...";
-                    msgEl.style.color = "#888";
-                }
-            } catch (e) {
-                console.error("Ошибка связи:", e);
-            }
+        if (data && data.command === "PAY") {
+            currentOrderAmount = data.amount;
+            document.getElementById('amt-display').innerText = data.amount + " ₽";
+            btn.disabled = false; // РАЗБЛОКИРУЕМ
+            msgEl.innerText = "Заказ найден!";
+            msgEl.style.color = "#00ff88";
+        } else {
+            btn.disabled = true; // БЛОКИРУЕМ, если команды нет
+            msgEl.innerText = "Команда PAY не найдена в БД для ID " + id;
+            msgEl.style.color = "red";
         }
-
+    } catch (e) {
+        console.error("Ошибка запроса к базе:", e);
+    }
+}
         // Логика оплаты
        async function sendPay() {
     const id = document.getElementById('target-id').value.trim();
