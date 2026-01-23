@@ -2,58 +2,105 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>ОНИКС: ПУЛЬТ КАССИРА</title>
+    <title>ONYX: КАССА-КОНТРОЛЬ</title>
     <style>
-        body { font-family: 'Arial', sans-serif; background: #000; color: #00ff41; text-align: center; padding: 20px; }
-        .panel { border: 2px solid #00ff41; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; background: #0a0a0a; box-shadow: 0 0 20px rgba(0,255,65,0.2); }
-        input { width: 100%; padding: 15px; margin: 10px 0; background: #111; border: 1px solid #00ff41; color: #00ff41; font-size: 20px; border-radius: 5px; text-align: center; }
-        .btn-trigger { background: #00ff41; color: #000; border: none; padding: 20px; width: 100%; font-weight: bold; font-size: 18px; border-radius: 5px; cursor: pointer; text-transform: uppercase; }
-        .btn-trigger:hover { background: #00cc33; box-shadow: 0 0 15px #00ff41; }
-        #log { margin-top: 15px; font-size: 12px; color: #888; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0b0f19; color: #fff; text-align: center; padding: 20px; }
+        .container { max-width: 400px; margin: auto; background: #161b22; padding: 25px; border-radius: 12px; border: 1px solid #30363d; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+        h2 { color: #58a6ff; margin-bottom: 20px; }
+        .input-box { text-align: left; margin-bottom: 15px; }
+        label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 5px; }
+        input { width: 100%; padding: 12px; background: #0d1117; border: 1px solid #30363d; color: #00ff41; border-radius: 6px; font-size: 18px; box-sizing: border-box; outline: none; }
+        input:focus { border-color: #58a6ff; }
+        .btn-pay { background: #238636; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; transition: 0.2s; }
+        .btn-pay:hover { background: #2ea043; }
+        .btn-pay:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+        #status { margin-top: 15px; font-size: 14px; padding: 10px; border-radius: 4px; min-height: 20px; }
     </style>
 </head>
 <body>
-    <div class="panel">
-        <h1 style="margin-top:0">ONYX CONTROL</h1>
-        <label>ID ТЕРМИНАЛА:</label>
-        <input type="number" id="tid" placeholder="123456" value="123456">
-        
-        <label>СУММА:</label>
-        <input type="number" id="amt" value="100.00">
 
-        <button class="btn-trigger" onclick="blastTerminal()">ОПЛАТИТЬ УДАЛЕННО</button>
-        <div id="log">Ожидание команды...</div>
+<div class="container">
+    <h2>ONYX PAY CONTROL</h2>
+    
+    <div class="input-box">
+        <label>ID ТЕРМИНАЛА</label>
+        <input type="number" id="tid" value="123456">
     </div>
 
-    <script>
-        const DB_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
+    <div class="input-box">
+        <label>СУММА ОПЛАТЫ (РУБ)</label>
+        <input type="number" id="amt" value="100.00">
+    </div>
 
-        async function blastTerminal() {
-            const id = document.getElementById('tid').value;
-            const log = document.getElementById('log');
-            
-            log.innerText = "Пронзаю систему...";
+    <button class="btn-pay" id="mainBtn" onclick="processPayment()">ПОДТВЕРДИТЬ ОПЛАТУ</button>
+    <div id="status">Система готова</div>
+</div>
 
-            try {
-                // 1. Сначала говорим терминалу, что пришла оплата
-                await fetch(`${DB_URL}/commands/${id}.json`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ command: "PAY", amount: 100, timestamp: Date.now() })
-                });
+<script>
+    const DB_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
-                // 2. И ТУТ ЖЕ принудительно ставим SUCCESS
-                await fetch(`${DB_URL}/status/${id}.json`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ state: "SUCCESS", lastUpdate: Date.now() })
-                });
+    async function processPayment() {
+        const id = document.getElementById('tid').value;
+        const userAmt = parseFloat(document.getElementById('amt').value);
+        const statusDiv = document.getElementById('status');
+        const btn = document.getElementById('mainBtn');
 
-                log.style.color = "#00ff41";
-                log.innerText = "СИГНАЛ ПРОШЕЛ. ТЕРМИНАЛ ДОЛЖЕН ПРИНЯТЬ ОПЛАТУ.";
-            } catch (e) {
-                log.style.color = "red";
-                log.innerText = "ОШИБКА: " + e.message;
+        if (!id || isNaN(userAmt)) return updateStatus("Ошибка ввода", "red");
+
+        try {
+            btn.disabled = true;
+            updateStatus("Проверка терминала...", "orange");
+
+            // 1. Сначала проверяем, что происходит на терминале
+            const res = await fetch(`${DB_URL}/commands/${id}.json`);
+            const cmdData = await res.json();
+
+            // Проверка: есть ли вообще активный запрос на оплату?
+            if (!cmdData || cmdData.command !== "PAY") {
+                updateStatus("ОШИБКА: Терминал не ждет оплаты!", "#ff4444");
+                btn.disabled = false;
+                return;
             }
+
+            // 2. ПРОВЕРКА СУММЫ: совпадает ли сумма в кассе с тем, что на терминале?
+            const terminalAmt = parseFloat(cmdData.amount);
+            if (userAmt !== terminalAmt) {
+                updateStatus(`ОШИБКА: Сумма не совпадает! На терминале: ${terminalAmt} ₽`, "#ff4444");
+                btn.disabled = false;
+                return;
+            }
+
+            // 3. Если всё ок — отправляем сигнал успеха
+            updateStatus("Сумма верна. Отправка подтверждения...", "cyan");
+            
+            await fetch(`${DB_URL}/status/${id}.json`, {
+                method: 'PATCH',
+                body: JSON.stringify({ 
+                    state: "SUCCESS", 
+                    paidAmount: userAmt,
+                    confirmedBy: "Admin" 
+                })
+            });
+
+            updateStatus("✅ ОПЛАЧЕНО УСПЕШНО", "#00ff41");
+            
+            // Очищаем команду через секунду
+            setTimeout(() => fetch(`${DB_URL}/commands/${id}.json`, { method: 'DELETE' }), 1000);
+
+        } catch (e) {
+            updateStatus("Ошибка связи: " + e.message, "red");
+        } finally {
+            btn.disabled = false;
         }
-    </script>
+    }
+
+    function updateStatus(msg, color) {
+        const s = document.getElementById('status');
+        s.innerText = msg;
+        s.style.color = color;
+        s.style.background = `rgba(255,255,255,0.05)`;
+    }
+</script>
+
 </body>
 </html>
