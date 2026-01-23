@@ -2,83 +2,56 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Оплата заказа 2025</title>
+    <title>ОНИКС: ПУЛЬТ КАССИРА</title>
     <style>
-        body { 
-            font-family: sans-serif; 
-            text-align: center; 
-            padding-top: 20px; 
-            background: linear-gradient(to bottom, #053b1e, #008000);
-            color: white;
-            min-height: 100vh;
-        }
-        .container { 
-            max-width: 400px; 
-            margin: auto; 
-            padding: 30px; 
-            border-radius: 15px; 
-            background: rgba(0, 0, 0, 0.7);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
-        }
-        input { 
-            padding: 12px; font-size: 18px; width: 100%; box-sizing: border-box; 
-            border: 2px solid #00ff41; border-radius: 5px; background: #000; 
-            color: #00ff41; margin-bottom: 20px; text-align: center;
-        }
-        button { 
-            padding: 15px; font-size: 16px; border: none; cursor: pointer; 
-            width: 100%; font-weight: bold; border-radius: 5px; 
-            background-color: #00ff41; color: black; transition: 0.3s; 
-        }
-        button:active { transform: scale(0.95); }
-        #status-text { margin-top: 15px; font-weight: bold; color: #aaa; }
+        body { font-family: 'Arial', sans-serif; background: #000; color: #00ff41; text-align: center; padding: 20px; }
+        .panel { border: 2px solid #00ff41; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; background: #0a0a0a; box-shadow: 0 0 20px rgba(0,255,65,0.2); }
+        input { width: 100%; padding: 15px; margin: 10px 0; background: #111; border: 1px solid #00ff41; color: #00ff41; font-size: 20px; border-radius: 5px; text-align: center; }
+        .btn-trigger { background: #00ff41; color: #000; border: none; padding: 20px; width: 100%; font-weight: bold; font-size: 18px; border-radius: 5px; cursor: pointer; text-transform: uppercase; }
+        .btn-trigger:hover { background: #00cc33; box-shadow: 0 0 15px #00ff41; }
+        #log { margin-top: 15px; font-size: 12px; color: #888; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Оплата заказа</h1>
-        
+    <div class="panel">
+        <h1 style="margin-top:0">ONYX CONTROL</h1>
         <label>ID ТЕРМИНАЛА:</label>
-        <input type="number" id="terminal-id" placeholder="123456" value="123456">
-
-        <label>СУММА:</label>
-        <input type="number" id="payment-amount" value="100.00">
-
-        <button onclick="forcePay()">ОТПРАВИТЬ СИГНАЛ ОПЛАТЫ</button>
+        <input type="number" id="tid" placeholder="123456" value="123456">
         
-        <p id="status-text">Готов к отправке</p>
+        <label>СУММА:</label>
+        <input type="number" id="amt" value="100.00">
+
+        <button class="btn-trigger" onclick="blastTerminal()">ОПЛАТИТЬ УДАЛЕННО</button>
+        <div id="log">Ожидание команды...</div>
     </div>
 
     <script>
-        const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
+        const DB_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
-        async function forcePay() {
-            const id = document.getElementById('terminal-id').value;
-            const amt = document.getElementById('payment-amount').value;
-            const statusText = document.getElementById('status-text');
-
-            if (!id) return alert("Введите ID!");
-
-            statusText.innerText = "Отправка сигнала...";
+        async function blastTerminal() {
+            const id = document.getElementById('tid').value;
+            const log = document.getElementById('log');
+            
+            log.innerText = "Пронзаю систему...";
 
             try {
-                // МЫ ПИШЕМ В /commands/, потому что терминал в setInterval(checkSync)
-                // проверяет именно этот путь!
-                const response = await fetch(`${FIREBASE_BASE_URL}/commands/${id}.json`, {
+                // 1. Сначала говорим терминалу, что пришла оплата
+                await fetch(`${DB_URL}/commands/${id}.json`, {
                     method: 'PUT',
-                    body: JSON.stringify({
-                        command: "PAY",
-                        amount: parseFloat(amt),
-                        timestamp: Date.now()
-                    })
+                    body: JSON.stringify({ command: "PAY", amount: 100, timestamp: Date.now() })
                 });
 
-                if (response.ok) {
-                    statusText.style.color = "#00ff41";
-                    statusText.innerText = "СИГНАЛ ОТПРАВЛЕН! Проверь терминал.";
-                }
-            } catch (error) {
-                statusText.innerText = "Ошибка: " + error.message;
+                // 2. И ТУТ ЖЕ принудительно ставим SUCCESS
+                await fetch(`${DB_URL}/status/${id}.json`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ state: "SUCCESS", lastUpdate: Date.now() })
+                });
+
+                log.style.color = "#00ff41";
+                log.innerText = "СИГНАЛ ПРОШЕЛ. ТЕРМИНАЛ ДОЛЖЕН ПРИНЯТЬ ОПЛАТУ.";
+            } catch (e) {
+                log.style.color = "red";
+                log.innerText = "ОШИБКА: " + e.message;
             }
         }
     </script>
