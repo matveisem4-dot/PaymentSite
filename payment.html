@@ -2,103 +2,156 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>ONYX: КАССА-КОНТРОЛЬ</title>
+    <title>ONYX: КАССА-ТЕРМИНАЛ</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #0b0f19; color: #fff; text-align: center; padding: 20px; }
         .container { max-width: 400px; margin: auto; background: #161b22; padding: 25px; border-radius: 12px; border: 1px solid #30363d; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
-        h2 { color: #58a6ff; margin-bottom: 20px; }
-        .input-box { text-align: left; margin-bottom: 15px; }
-        label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 5px; }
-        input { width: 100%; padding: 12px; background: #0d1117; border: 1px solid #30363d; color: #00ff41; border-radius: 6px; font-size: 18px; box-sizing: border-box; outline: none; }
-        input:focus { border-color: #58a6ff; }
-        .btn-pay { background: #238636; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; transition: 0.2s; }
-        .btn-pay:hover { background: #2ea043; }
-        .btn-pay:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
-        #status { margin-top: 15px; font-size: 14px; padding: 10px; border-radius: 4px; min-height: 20px; }
+        h2 { color: #58a6ff; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .input-box { text-align: left; margin-bottom: 12px; }
+        label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 5px; text-transform: uppercase; }
+        
+        input { 
+            width: 100%; padding: 12px; background: #0d1117; border: 1px solid #30363d; 
+            color: #00ff41; border-radius: 6px; font-size: 16px; box-sizing: border-box; outline: none; 
+            transition: 0.3s;
+        }
+        input:focus { border-color: #58a6ff; box-shadow: 0 0 8px rgba(88, 166, 255, 0.3); }
+
+        .card-section { 
+            margin-top: 20px; padding-top: 20px; border-top: 1px dashed #30363d; 
+        }
+
+        .btn-pay { 
+            background: #238636; color: #fff; border: none; padding: 16px; 
+            width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; 
+            font-size: 16px; margin-top: 15px; transition: 0.2s; 
+        }
+        .btn-pay:hover { background: #2ea043; transform: translateY(-2px); }
+        .btn-pay:disabled { background: #21262d; color: #484f58; cursor: not-allowed; transform: none; }
+        
+        #status { 
+            margin-top: 15px; font-size: 13px; padding: 10px; border-radius: 4px; 
+            min-height: 20px; line-height: 1.4;
+        }
+        .error { color: #ff4444; background: rgba(255, 68, 68, 0.1); border: 1px solid #ff4444; }
+        .success { color: #00ff41; background: rgba(0, 255, 65, 0.1); border: 1px solid #00ff41; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>ONYX PAY CONTROL</h2>
+    <h2>ONYX Pay Control</h2>
     
     <div class="input-box">
         <label>ID ТЕРМИНАЛА</label>
-        <input type="number" id="tid" value="123456">
+        <input type="number" id="tid" placeholder="Введите ID" value="123456">
     </div>
 
     <div class="input-box">
-        <label>СУММА ОПЛАТЫ (РУБ)</label>
+        <label>СУММА К ОПЛАТЕ</label>
         <input type="number" id="amt" value="100.00">
     </div>
 
-    <button class="btn-pay" id="mainBtn" onclick="processPayment()">ПОДТВЕРДИТЬ ОПЛАТУ</button>
-    <div id="status">Система готова</div>
+    <div class="card-section">
+        <div class="input-box">
+            <label>НОМЕР КАРТЫ</label>
+            <input type="text" id="card-num" placeholder="0000 0000 0000 0000">
+        </div>
+        <div class="input-box">
+            <label>ПИН-КОД</label>
+            <input type="password" id="card-pin" placeholder="****" maxlength="4">
+        </div>
+    </div>
+
+    <button class="btn-pay" id="mainBtn" onclick="securePayment()">ПОДТВЕРДИТЬ И ОПЛАТИТЬ</button>
+    <div id="status">Введите данные карты</div>
 </div>
 
 <script>
     const DB_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
 
-    async function processPayment() {
+    async function securePayment() {
         const id = document.getElementById('tid').value;
         const userAmt = parseFloat(document.getElementById('amt').value);
-        const statusDiv = document.getElementById('status');
+        const cardNum = document.getElementById('card-num').value.replace(/\s/g, '');
+        const cardPin = document.getElementById('card-pin').value;
         const btn = document.getElementById('mainBtn');
 
-        if (!id || isNaN(userAmt)) return updateStatus("Ошибка ввода", "red");
+        if (!id || !cardNum || !cardPin) return updateStatus("Заполните все поля!", "error");
 
         try {
             btn.disabled = true;
-            updateStatus("Проверка терминала...", "orange");
+            updateStatus("Авторизация...", "");
 
-            // 1. Сначала проверяем, что происходит на терминале
-            const res = await fetch(`${DB_URL}/commands/${id}.json`);
-            const cmdData = await res.json();
+            // 1. ПРОВЕРКА ТЕРМИНАЛА
+            const cmdRes = await fetch(`${DB_URL}/commands/${id}.json`);
+            const cmdData = await cmdRes.json();
 
-            // Проверка: есть ли вообще активный запрос на оплату?
             if (!cmdData || cmdData.command !== "PAY") {
-                updateStatus("ОШИБКА: Терминал не ждет оплаты!", "#ff4444");
                 btn.disabled = false;
-                return;
+                return updateStatus("ОШИБКА: Терминал не ждет оплаты", "error");
             }
 
-            // 2. ПРОВЕРКА СУММЫ: совпадает ли сумма в кассе с тем, что на терминале?
-            const terminalAmt = parseFloat(cmdData.amount);
-            if (userAmt !== terminalAmt) {
-                updateStatus(`ОШИБКА: Сумма не совпадает! На терминале: ${terminalAmt} ₽`, "#ff4444");
+            if (userAmt !== parseFloat(cmdData.amount)) {
                 btn.disabled = false;
-                return;
+                return updateStatus(`ОШИБКА: Сумма не совпадает. Ждем: ${cmdData.amount}₽`, "error");
             }
 
-            // 3. Если всё ок — отправляем сигнал успеха
-            updateStatus("Сумма верна. Отправка подтверждения...", "cyan");
-            
+            // 2. ПРОВЕРКА КАРТЫ И БАЛАНСА
+            const cardRes = await fetch(`${DB_URL}/cards/${cardNum}.json`);
+            const cardData = await cardRes.json();
+
+            if (!cardData) {
+                btn.disabled = false;
+                return updateStatus("ОШИБКА: Карта не найдена", "error");
+            }
+
+            if (cardData.pin != cardPin) {
+                btn.disabled = false;
+                return updateStatus("ОШИБКА: Неверный ПИН-код", "error");
+            }
+
+            if (cardData.balance < userAmt) {
+                btn.disabled = false;
+                return updateStatus(`ОШИБКА: Недостаточно средств (${cardData.balance}₽)`, "error");
+            }
+
+            // 3. СПИСАНИЕ СРЕДСТВ
+            const newBalance = cardData.balance - userAmt;
+            await fetch(`${DB_URL}/cards/${cardNum}.json`, {
+                method: 'PATCH',
+                body: JSON.stringify({ balance: newBalance })
+            });
+
+            // 4. ОТПРАВКА СИГНАЛА УСПЕХА
             await fetch(`${DB_URL}/status/${id}.json`, {
                 method: 'PATCH',
                 body: JSON.stringify({ 
                     state: "SUCCESS", 
                     paidAmount: userAmt,
-                    confirmedBy: "Admin" 
+                    method: "REMOTE_CARD" 
                 })
             });
 
-            updateStatus("✅ ОПЛАЧЕНО УСПЕШНО", "#00ff41");
+            // Удаляем команду
+            await fetch(`${DB_URL}/commands/${id}.json`, { method: 'DELETE' });
+
+            updateStatus("✅ ОПЛАЧЕНО! Сигнал отправлен.", "success");
             
-            // Очищаем команду через секунду
-            setTimeout(() => fetch(`${DB_URL}/commands/${id}.json`, { method: 'DELETE' }), 1000);
+            // Очистка полей
+            document.getElementById('card-pin').value = '';
 
         } catch (e) {
-            updateStatus("Ошибка связи: " + e.message, "red");
-        } finally {
+            updateStatus("ОШИБКА СЕТИ: " + e.message, "error");
             btn.disabled = false;
         }
     }
 
-    function updateStatus(msg, color) {
+    function updateStatus(msg, type) {
         const s = document.getElementById('status');
         s.innerText = msg;
-        s.style.color = color;
-        s.style.background = `rgba(255,255,255,0.05)`;
+        s.className = type; 
     }
 </script>
 
