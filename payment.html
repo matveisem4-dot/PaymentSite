@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Оплата заказа</title>
+    <title>Оплата заказа 2025</title>
     <style>
         body { 
             font-family: sans-serif; 
@@ -10,7 +10,6 @@
             padding-top: 20px; 
             background: linear-gradient(to bottom, #004d25, #008000, #4CAF50);
             color: white;
-            position: relative;
             min-height: 100vh;
         }
         .container { 
@@ -24,21 +23,15 @@
         }
         .input-group { margin-bottom: 20px; text-align: left; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
-        
         input { 
             padding: 12px; font-size: 16px; width: 100%; box-sizing: border-box; 
             border: 1px solid #ddd; border-radius: 5px; background-color: black; 
-            color: red; caret-color: red;
+            color: #00ff41; caret-color: #00ff41;
         }
-        
         button { padding: 15px; font-size: 16px; border: none; cursor: pointer; width: 100%; font-weight: bold; border-radius: 5px; margin-top: 10px; transition: 0.3s; }
-        .btn-card { background-color: #007bff; color: white; }
-        
-        #sberkot-image {
-            position: absolute; bottom: 20px; right: 20px; width: 100px; pointer-events: none;
-        }
-        
-        #status-text { margin-top: 15px; font-weight: bold; }
+        .btn-pay { background-color: #00ff41; color: black; }
+        .btn-pay:disabled { background-color: #555; cursor: not-allowed; }
+        #status-text { margin-top: 15px; font-weight: bold; min-height: 1.2em; }
     </style>
 </head>
 <body>
@@ -46,101 +39,97 @@
         <h1>Оплата заказа 2025</h1>
         
         <div class="input-group">
-            <label for="terminal-id">ID ТЕРМИНАЛА:</label>
-            <input type="number" id="terminal-id" placeholder="123456" value="123456">
+            <label for="terminal-id">ID ТЕРМИНАЛА (6 цифр):</label>
+            <input type="number" id="terminal-id" placeholder="Напр: 123456">
         </div>
 
-        <div id="manual-pay-section">
-            <div class="input-group">
-                <label for="payment-input">СУММА ОПЛАТЫ (РУБ):</label>
-                <input type="number" id="payment-input" placeholder="0.00" step="0.01" value="100.00">
-            </div>
-            <button class="btn-card" onclick="handlePaymentClick()">ОПЛАТИТЬ КАРТОЙ</button>
+        <div class="input-group">
+            <label for="payment-input">СУММА К ОПЛАТЕ (₽):</label>
+            <input type="number" id="payment-input" placeholder="0.00" step="0.01">
         </div>
         
-        <p id="status-text" style="margin-top: 15px; font-weight: bold;">Система готова</p>
+        <button id="pay-button" class="btn-pay" onclick="sendPaymentCommand()">ОТПРАВИТЬ НА ТЕРМИНАЛ</button>
+        
+        <p id="status-text">Система готова</p>
     </div>
-
-    <img id="sberkot-image" src="free-png.ru" alt="СберКот" />
 
     <script>
         const FIREBASE_BASE_URL = "https://cassa-simulator-4-default-rtdb.firebaseio.com";
+        let checkStatusInterval = null;
 
-        // Проверяем наличие ID терминала в URL (если пользователь пришел по QR-коду)
+        // Автозаполнение из URL
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
-            const terminalIdFromUrl = urlParams.get('id');
-            const amountFromUrl = urlParams.get('amount');
-            if (terminalIdFromUrl) {
-                document.getElementById('terminal-id').value = terminalIdFromUrl;
-            }
-            if (amountFromUrl) {
-                document.getElementById('payment-input').value = amountFromUrl;
-            }
+            if (urlParams.get('id')) document.getElementById('terminal-id').value = urlParams.get('id');
+            if (urlParams.get('amount')) document.getElementById('payment-input').value = urlParams.get('amount');
         };
 
-
-        async function handlePaymentClick() {
+        async function sendPaymentCommand() {
             const terminalId = document.getElementById('terminal-id').value;
-            const userEnteredAmount = parseFloat(document.getElementById('payment-input').value);
+            const amount = parseFloat(document.getElementById('payment-input').value);
             const statusText = document.getElementById('status-text');
+            const btn = document.getElementById('pay-button');
 
-            if (!terminalId || isNaN(userEnteredAmount) || userEnteredAmount <= 0) {
-                statusText.style.color = "red";
-                statusText.innerText = "Ошибка: Введите корректные данные.";
+            if (!terminalId || isNaN(amount) || amount <= 0) {
+                updateStatus("Введите ID и сумму!", "red");
                 return;
             }
-            
-            statusText.style.color = "orange";
-            statusText.innerText = "Проверка суммы...";
 
             try {
-                // 1. Запрашиваем у Firebase статус терминала
-                const response = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
-                const data = await response.json();
+                btn.disabled = true;
+                updateStatus("Вызов терминала...", "orange");
+
+                // 1. Отправляем команду PAY терминалу
+                await fetch(`${FIREBASE_BASE_URL}/commands/${terminalId}.json`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        command: "PAY",
+                        amount: amount,
+                        timestamp: Date.now()
+                    })
+                });
+
+                updateStatus("Ожидание оплаты на терминале...", "yellow");
+
+                // 2. Начинаем следить за статусом терминала
+                if (checkStatusInterval) clearInterval(checkStatusInterval);
                 
-                // Проверяем, удалось ли получить данные
-                if (!data) {
-                    statusText.style.color = "red";
-                    statusText.innerText = "Ошибка: Терминал не найден или неактивен в Firebase.";
-                    return;
-                }
-
-                // 2. Проверяем ожидаемую сумму и статус
-                const expectedAmount = parseFloat(data.amount);
-                const isWaiting = data.state === "WAITING_PAYMENT";
-                const amountsMatch = userEnteredAmount === expectedAmount;
-
-                if (isWaiting && !isNaN(expectedAmount) && amountsMatch) {
-                    // Суммы совпадают и терминал ждет оплаты - отправляем SUCCESS
-                     await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`, {
-                        method: 'PATCH',
-                        body: JSON.stringify({ state: "SUCCESS", paidAmount: userEnteredAmount, lastPaymentType: "card" })
-                    });
-                    statusText.style.color = "green";
-                    statusText.innerText = "✅ Оплата картой прошла успешно!";
-
-                } else if (!isWaiting) {
-                    // Если терминал не ждет оплаты (idle, success и т.д.)
-                    statusText.style.color = "red";
-                    statusText.innerText = `Ошибка: Терминал сейчас не принимает оплату (текущий статус: ${data.state}).`;
-                
-                } else if (!isNaN(expectedAmount) && !amountsMatch) {
-                    // Если суммы не совпадают - отказ
-                    statusText.style.color = "red";
-                    statusText.innerText = `Ошибка: Сумма не совпадает с терминалом. Ожидается: ${expectedAmount} РУБ.`;
-
-                } else {
-                     // Непредвиденная ошибка данных
-                    statusText.style.color = "red";
-                    statusText.innerText = "Неизвестная ошибка при проверке данных.";
-                }
+                checkStatusInterval = setInterval(() => {
+                    checkTerminalStatus(terminalId);
+                }, 2000);
 
             } catch (error) {
-                statusText.style.color = "red";
-                statusText.innerText = "Ошибка связи с Firebase: " + error.message;
+                btn.disabled = false;
+                updateStatus("Ошибка сети: " + error.message, "red");
             }
         }
-    </script>       
+
+        async function checkTerminalStatus(terminalId) {
+            const statusText = document.getElementById('status-text');
+            const btn = document.getElementById('pay-button');
+
+            try {
+                const res = await fetch(`${FIREBASE_BASE_URL}/status/${terminalId}.json`);
+                const data = await res.json();
+
+                if (data && data.state === "SUCCESS") {
+                    clearInterval(checkStatusInterval);
+                    updateStatus("✅ ОПЛАЧЕНО УСПЕШНО!", "#00ff41");
+                    btn.disabled = false;
+                    
+                    // Очистка команды после успеха (опционально, терминал сам удалит)
+                    setTimeout(() => updateStatus("Система готова", "white"), 5000);
+                }
+            } catch (e) {
+                console.error("Ошибка синхронизации");
+            }
+        }
+
+        function updateStatus(text, color) {
+            const st = document.getElementById('status-text');
+            st.innerText = text;
+            st.style.color = color;
+        }
+    </script>
 </body>
 </html>
